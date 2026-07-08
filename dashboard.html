@@ -1,0 +1,532 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Trade Journal — Nathan Yap</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+  :root {
+    --bg: #f6f5f1; --hero: #eceee3; --card: #ffffff;
+    --border: #e5e4de; --ink: #18181b; --muted: #71717a;
+    --profit: #1f9d76; --loss: #d5543f; --equity: #b28a2e;
+    --grid: rgba(24,24,27,.07);
+    --radius: 14px;
+    --shadow: 0 1px 2px rgba(24,24,27,.05);
+  }
+  * { box-sizing: border-box; margin: 0; }
+  body { background: var(--bg); color: var(--ink);
+    font-family: 'Inter', system-ui, sans-serif; font-size: 14px; display: flex; min-height: 100vh; }
+  .mono { font-family: 'IBM Plex Mono', monospace; }
+
+  /* ---------- sidebar (collapsible) ---------- */
+  aside { width: 232px; flex-shrink: 0; border-right: 1px solid var(--border);
+    background: var(--bg); padding: 22px 16px; display: flex; flex-direction: column; gap: 4px;
+    transition: margin-left .25s ease; }
+  body.nav-hidden aside { margin-left: -232px; }
+  .brand { font-weight: 700; font-size: 17px; letter-spacing: -.02em; padding: 2px 10px 20px; }
+  .navlabel { font-size: 11px; color: var(--muted); text-transform: uppercase;
+    letter-spacing: .06em; padding: 16px 10px 6px; }
+  aside a { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 9px;
+    color: var(--ink); text-decoration: none; font-weight: 500; font-size: 13.5px; }
+  aside a:hover { background: #ecebe5; }
+  aside a.active { background: #e7e6df; }
+  aside a .badge { margin-left: auto; background: #e4e3dc; border-radius: 99px;
+    font-size: 11px; padding: 1px 8px; color: var(--muted); }
+  aside .foot { margin-top: auto; padding: 10px; font-size: 12px; color: var(--muted); }
+  aside svg { width: 16px; height: 16px; stroke: currentColor; fill: none; stroke-width: 1.8; opacity: .75; }
+
+  main { flex: 1; min-width: 0; padding: 18px clamp(16px, 3vw, 36px) 56px; }
+
+  /* ---------- topbar ---------- */
+  .topbar { display: flex; align-items: center; gap: 14px; padding: 6px 0 18px; flex-wrap: wrap; }
+  .icon-btn { border: 1px solid var(--border); background: var(--card); border-radius: 10px;
+    width: 36px; height: 36px; display: grid; place-items: center; cursor: pointer;
+    box-shadow: var(--shadow); }
+  .icon-btn:hover { background: #f1f0ea; }
+  .icon-btn svg { width: 16px; height: 16px; stroke: var(--ink); fill: none; stroke-width: 2; }
+  .topbar .range { color: var(--muted); font-size: 13px; }
+  .topbar .spacer { flex: 1; }
+  .btn-dark { background: var(--ink); color: #fff; border: none; border-radius: 11px;
+    padding: 10px 18px; font-weight: 600; font-size: 13.5px; cursor: pointer;
+    display: inline-flex; align-items: center; gap: 8px; box-shadow: var(--shadow); }
+  .btn-dark:hover { opacity: .88; }
+  .btn-dark svg { width: 15px; height: 15px; stroke: #fff; fill: none; stroke-width: 2.2; }
+  .fname { font-size: 12px; color: var(--muted); }
+  input[type=file] { position: absolute; width: 1px; height: 1px; opacity: 0; }
+
+  /* ---------- hero band ---------- */
+  .hero { background: var(--hero); border-radius: 18px; padding: 26px clamp(18px, 3vw, 34px);
+    display: grid; grid-template-columns: minmax(0,1.25fr) minmax(0,1fr) minmax(0,.7fr) minmax(0,1fr);
+    gap: clamp(14px, 2.2vw, 30px); align-items: center; margin-bottom: 26px; overflow: hidden; }
+  .hero h3 { font-size: 14px; font-weight: 600; margin-bottom: 10px; }
+  .hero .mini { height: 130px; }
+  .hero .gauge { position: relative; height: 140px; display: grid; place-items: center; }
+  .gauge .center { position: absolute; text-align: center; top: 58%; }
+  .gauge .center .pct { font-size: 26px; font-weight: 700; letter-spacing: -.02em; }
+  .gauge .center .cap { font-size: 12px; color: var(--muted); }
+  .stat { align-self: center; min-width: 150px; }
+  .stat .num { font-size: 34px; font-weight: 700; letter-spacing: -.03em; line-height: 1.1; }
+  .stat .num.neg { color: var(--loss); } .stat .num.pos { color: var(--profit); }
+  .stat .cap { color: var(--ink); font-size: 13.5px; font-weight: 600; margin-top: 6px; white-space: nowrap; }
+  .stat .detail { color: var(--muted); font-size: 12.5px; margin-top: 8px; padding-top: 8px;
+    border-top: 1px solid rgba(24,24,27,.1); line-height: 1.5; }
+  @media (max-width: 1220px) { .hero { grid-template-columns: 1fr 1fr; row-gap: 26px; } }
+  @media (max-width: 980px) {
+    body:not(.nav-hidden) aside { position: fixed; z-index: 30; height: 100vh; box-shadow: 0 0 40px rgba(0,0,0,.15); } }
+  @media (max-width: 620px) { .hero { grid-template-columns: 1fr; } }
+
+  /* ---------- KPI chips ---------- */
+  .kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 12px; margin-bottom: 26px; }
+  .kpi { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius);
+    padding: 14px 16px; box-shadow: var(--shadow); }
+  .kpi .label { font-size: 11px; letter-spacing: .04em; text-transform: uppercase;
+    color: var(--muted); margin-bottom: 6px; font-weight: 500; }
+  .kpi .value { font-size: 19px; font-weight: 700; letter-spacing: -.01em; }
+  .kpi .value.pos { color: var(--profit); } .kpi .value.neg { color: var(--loss); }
+
+  /* ---------- cards ---------- */
+  .card { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius);
+    padding: 20px 20px 14px; box-shadow: var(--shadow); margin-bottom: 18px; }
+  .card h2 { font-size: 14.5px; font-weight: 600; margin-bottom: 2px; }
+  .card .sub { font-size: 12.5px; color: var(--muted); margin-bottom: 14px; }
+  .tall { height: 380px; } .tall canvas { max-height: 290px; }
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; margin-bottom: 18px; }
+  .grid2 .card { margin-bottom: 0; height: 300px; }
+  .grid2 canvas { max-height: 205px; }
+  @media (max-width: 860px) { .grid2 { grid-template-columns: 1fr; } }
+
+  /* ---------- table ---------- */
+  table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+  th, td { text-align: right; padding: 9px 12px; border-bottom: 1px solid var(--grid); white-space: nowrap; }
+  th { color: var(--muted); font-weight: 500; font-size: 11px; text-transform: uppercase; letter-spacing: .05em; }
+  th.l, td.l { text-align: left; }
+  td { font-family: 'IBM Plex Mono', monospace; font-size: 12px; }
+  td.pos { color: var(--profit); } td.neg { color: var(--loss); } td.be { color: var(--muted); }
+  .pill { display: inline-block; border-radius: 99px; padding: 2px 9px; font-size: 11px;
+    font-family: 'Inter', sans-serif; font-weight: 600; }
+  .pill.win { background: #e3f2ec; color: var(--profit); }
+  .pill.loss { background: #fbe9e4; color: var(--loss); }
+  .pill.be { background: #ececec; color: var(--muted); }
+  .table-wrap { overflow: auto; max-height: 430px; }
+  footer { color: var(--muted); font-size: 12px; line-height: 1.7; margin-top: 22px; }
+</style>
+</head>
+<body>
+
+<aside id="sidebar">
+  <div class="brand">Trade Journal</div>
+  <a href="#top" class="active"><svg viewBox="0 0 24 24"><path d="M3 12l9-8 9 8M5 10v10h5v-6h4v6h5V10"/></svg>Overview</a>
+  <a href="#equity"><svg viewBox="0 0 24 24"><path d="M3 17l6-6 4 4 7-8M21 7v5h-5"/></svg>Equity</a>
+  <a href="#discipline"><svg viewBox="0 0 24 24"><path d="M12 3l7 4v5c0 5-3.5 8-7 9-3.5-1-7-4-7-9V7z"/></svg>Discipline</a>
+  <a href="#log"><svg viewBox="0 0 24 24"><path d="M4 5h16M4 12h16M4 19h10"/></svg>Trade log</a>
+  <div class="navlabel">Data</div>
+  <a href="#" id="reload"><svg viewBox="0 0 24 24"><path d="M4 4v6h6M20 20v-6h-6M5.5 9A8 8 0 0119 7.5M18.5 15A8 8 0 015 16.5"/></svg>Reset to my journal</a>
+  <div class="foot">Nathan Yap · Feb–Jun 2026<br>81 trades · crypto derivatives</div>
+</aside>
+
+<main id="top">
+  <div class="topbar">
+    <button class="icon-btn" id="navtoggle" title="Toggle sidebar">
+      <svg viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h16"/></svg></button>
+    <div>
+      <div style="font-weight:700; font-size:16px; letter-spacing:-.01em">Performance overview</div>
+      <div class="range mono" id="range">—</div>
+    </div>
+    <div class="spacer"></div>
+    <span class="fname" id="fname">my journal · embedded</span>
+    <label class="btn-dark"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
+      Load journal<input type="file" id="csv" accept=".csv,.xlsx,.xls"></label>
+  </div>
+
+  <section class="hero">
+    <div><h3>Net R by month</h3><div class="mini"><canvas id="heromonthly"></canvas></div></div>
+    <div class="gauge"><canvas id="gauge"></canvas>
+      <div class="center"><div class="pct" id="gaugepct">—</div><div class="cap">rule-compliant trades</div></div></div>
+    <div class="stat">
+      <div class="num" id="stat-trades">—</div>
+      <div class="cap">trades journaled</div>
+      <div class="detail" id="stat-streak">—</div>
+    </div>
+    <div class="stat">
+      <div class="num" id="stat-net">—</div>
+      <div class="cap">net result</div>
+      <div class="detail" id="stat-clean">—</div>
+    </div>
+  </section>
+
+  <div class="kpis" id="kpis"></div>
+
+  <div class="card tall" id="equity-card">
+    <a id="equity"></a><h2>Equity curve (R)</h2>
+    <div class="sub">cumulative R-multiples per trade · red bars show distance below the running peak (drawdown)</div>
+    <canvas id="equitychart"></canvas>
+  </div>
+
+  <div class="grid2" id="discipline">
+    <div class="card"><h2>Discipline</h2>
+      <div class="sub">expectancy per trade — rule-compliant vs violation trades</div>
+      <canvas id="disciplinechart"></canvas></div>
+    <div class="card"><h2>Expectancy by setup grade</h2>
+      <div class="sub">grade assigned at entry vs realised R per trade</div>
+      <canvas id="grade"></canvas></div>
+  </div>
+
+  <div class="grid2">
+    <div class="card"><h2>Per-trade R</h2>
+      <div class="sub">each bar is one trade, in sequence</div>
+      <canvas id="pertrade"></canvas></div>
+    <div class="card"><h2>R-multiple distribution</h2>
+      <div class="sub">outcome buckets across all trades</div>
+      <canvas id="rdist"></canvas></div>
+  </div>
+
+  <div class="grid2">
+    <div class="card"><h2>Breakout vs Range-Bound</h2>
+      <div class="sub">expectancy per trade by trade type · direction read from volume profile</div>
+      <canvas id="typechart"></canvas></div>
+    <div class="card"><h2>Win rate by type</h2>
+      <div class="sub">wins as a share of decided trades (excl. break-even)</div>
+      <canvas id="typewin"></canvas></div>
+  </div>
+
+  <div class="card">
+    <a id="log"></a><h2>Trade log</h2>
+    <div class="sub">most recent first</div>
+    <div class="table-wrap"><table id="logtable"></table></div>
+  </div>
+
+  <footer>
+    Single-file dashboard · analytics reproduced in SQL (analysis.sql) ·
+    accepts the original journal workbook (Master sheet) or CSV with columns:
+    date, direction, result (Win/Loss/BE), r, violations, type, grade.
+  </footer>
+</main>
+
+<script>
+const MY_JOURNAL = `date,direction,result,r,violations,type,grade
+2026-02-05,Short,Win,1.72,0,Breakout,B+
+2026-02-06,Long,Win,2.83,0,Breakout,A-
+2026-02-08,Long,Win,0.735,1,Breakout,B-
+2026-02-09,Short,Loss,-0.5,1,Breakout,B
+2026-02-10,Short,Loss,-1,0,Breakout,B
+2026-02-11,Short,Loss,-0.5,1,Breakout,C+
+2026-02-12,Short,Loss,-1,1,Breakout,B-
+2026-02-12,Short,Loss,-1,0,Breakout,A-
+2026-02-15,Short,BE,0,0,Breakout,B+
+2026-02-17,Short,Loss,-0.5,3,Breakout,C
+2026-02-18,Short,Loss,-1,4,Breakout,D
+2026-02-18,Short,Loss,-1,1,Breakout,D
+2026-02-19,Long,Loss,-1,1,Breakout,C+
+2026-02-19,Long,Loss,-1,0,Range-Bound,C
+2026-02-20,Long,BE,0,1,Range-Bound,C
+2026-02-20,Long,Loss,-1,1,Breakout,C+
+2026-02-24,Short,Win,1.49,0,Breakout,C+
+2026-02-26,Short,Win,4.91,0,Range-Bound,C
+2026-02-27,Short,Win,0.725,0,Range-Bound,C
+2026-03-01,Long,Loss,-0.5,0,Breakout,C
+2026-03-03,Long,Win,2.89,0,Breakout,B+
+2026-03-05,Short,Loss,-1,1,Breakout,C
+2026-03-05,Short,Win,2.82,0,Breakout,B
+2026-03-08,Short,Loss,-0.5,1,Breakout,C
+2026-03-09,Short,Loss,-1,0,Range-Bound,C+
+2026-03-10,Long,Loss,-1,1,Breakout,C
+2026-03-10,Short,Win,1,0,Range-Bound,C
+2026-03-11,Long,Loss,-1,0,Breakout,B-
+2026-03-12,Long,Win,2.91,0,Breakout,C+
+2026-03-13,Short,Win,2.76,0,Range-Bound,C+
+2026-03-15,Long,Win,0.705,0,Breakout,B
+2026-03-17,Long,Loss,-1,1,Range-Bound,B-
+2026-03-18,Short,Win,1.82,0,Breakout,B-
+2026-03-18,Long,Loss,-0.5,2,Breakout,D
+2026-03-19,Long,Loss,-1,1,Range-Bound,B
+2026-03-20,Short,Loss,-2,1,Breakout,B-
+2026-03-22,Long,Loss,-0.5,0,Range-Bound,B
+2026-03-23,Short,Win,0.1975,0,Range-Bound,B
+2026-03-24,Short,Loss,-1,1,Breakout,B+
+2026-03-25,Short,BE,0,2,Range-Bound,B-
+2026-03-26,Short,Win,4.34,0,Breakout,B+
+2026-03-31,Long,BE,0,0,Breakout,B
+2026-04-01,Long,Loss,-1,1,Breakout,B
+2026-04-02,Long,Loss,-1,1,Breakout,B+
+2026-04-03,Short,Loss,-1,0,Range-Bound,B
+2026-04-07,Short,Loss,-1,0,Breakout,B
+2026-04-08,Short,Loss,-1,0,Breakout,B+
+2026-04-09,Short,Loss,-1,0,Breakout,B+
+2026-04-10,Long,Win,2.08,0,Breakout,B
+2026-04-10,Short,Loss,-1,1,Range-Bound,B
+2026-04-12,Short,Loss,-1,0,Breakout,B+
+2026-04-13,Short,Loss,-0.25,0,Range-Bound,C+
+2026-04-14,Short,Loss,-1.6875,0,Range-Bound,B+
+2026-04-15,Short,Loss,-1,0,Breakout,B
+2026-04-15,Short,Loss,-0.5,1,Breakout,B
+2026-04-16,Long,Win,0.9,0,Range-Bound,A
+2026-04-19,Long,Loss,-1,0,Breakout,A
+2026-04-19,Short,Win,1,0,Range-Bound,B
+2026-04-21,Long,Loss,-1,0,Range-Bound,B
+2026-04-21,Short,Loss,-1,0,Breakout,C
+2026-04-22,Short,BE,0,0,Range-Bound,B
+2026-04-23,Long,Loss,-1,0,Range-Bound,B
+2026-04-24,Short,Loss,-0.75,0,Range-Bound,C
+2026-04-26,Long,Win,3.1,0,Breakout,A+
+2026-04-27,Long,Loss,-1,0,Range-Bound,C
+2026-04-30,Short,Loss,-1,1,Range-Bound,C
+2026-05-03,Short,Loss,-1,1,Range-Bound,B
+2026-05-05,Long,Loss,-0.75,2,Breakout,C-
+2026-05-06,Short,Loss,-0.75,1,Breakout,B
+2026-05-10,Long,Loss,-1,0,Breakout,B
+2026-05-12,Short,Loss,-0.75,0,Breakout,B
+2026-05-27,Short,Win,0.54,0,Breakout,B+
+2026-06-03,Short,Win,3.8,0,Breakout,A-
+2026-06-05,Short,Loss,-1,0,Breakout,D
+2026-06-10,Long,Loss,-1,2,Breakout,C
+2026-06-11,Short,Loss,-1,0,Range-Bound,B
+2026-06-16,Long,Loss,-1,1,Range-Bound,C
+2026-06-17,Long,BE,0,0,Range-Bound,B
+2026-06-23,Short,Loss,-1,2,Breakout,C
+2026-06-25,Long,Loss,-1,0,Range-Bound,D
+2026-06-26,Short,Loss,-1,0,Range-Bound,B`;
+
+const css = v => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+const C = { profit: css('--profit'), loss: css('--loss'), equity: css('--equity'),
+            muted: css('--muted'), grid: css('--grid'), ink: css('--ink') };
+Chart.defaults.font.family = "'IBM Plex Mono', monospace";
+Chart.defaults.font.size = 11;
+Chart.defaults.color = C.muted;
+Chart.defaults.borderColor = C.grid;
+Chart.defaults.plugins.legend.display = false;
+
+let charts = [];
+const fR = n => (n >= 0 ? '+' : '') + n.toFixed(2) + 'R';
+const gradeBucket = g => { g = String(g || '?'); return 'ABCD'.includes(g[0]) ? g[0] : '?'; };
+
+function analyse(rows) {
+  rows = rows.filter(r => r.date && r.result && !isNaN(parseFloat(r.r)))
+             .map(r => ({ ...r, r: parseFloat(r.r), violations: parseInt(r.violations) || 0 }))
+             .sort((a, b) => String(a.date).localeCompare(String(b.date)));
+  if (!rows.length) { alert('No valid rows found — see footer for expected columns.'); return; }
+
+  const wins = rows.filter(r => r.result === 'Win'),
+        losses = rows.filter(r => r.result === 'Loss');
+  const netR = rows.reduce((s, r) => s + r.r, 0);
+  let cum = 0, peak = 0, maxDD = 0;
+  const eq = rows.map(r => { cum += r.r; peak = Math.max(peak, cum);
+    maxDD = Math.min(maxDD, cum - peak); return { d: r.date, v: cum, dd: cum - peak }; });
+  const clean = rows.filter(r => r.violations === 0), vio = rows.filter(r => r.violations > 0);
+  const exp = a => a.length ? a.reduce((s, r) => s + r.r, 0) / a.length : 0;
+
+  let streak = 0, worst = 0;
+  rows.forEach(r => { streak = r.result === 'Loss' ? streak + 1 : 0; worst = Math.max(worst, streak); });
+
+  document.getElementById('range').textContent =
+    rows[0].date + ' → ' + rows[rows.length - 1].date;
+
+  /* hero */
+  document.getElementById('gaugepct').textContent = Math.round(100 * clean.length / rows.length) + '%';
+  document.getElementById('stat-trades').textContent = rows.length;
+  document.getElementById('stat-streak').textContent = 'longest losing streak · ' + worst;
+  const netEl = document.getElementById('stat-net');
+  netEl.textContent = fR(netR); netEl.className = 'num ' + (netR >= 0 ? 'pos' : 'neg');
+  document.getElementById('stat-clean').textContent = 'rule-compliant only · ' + fR(clean.reduce((s,r)=>s+r.r,0));
+
+  const kpis = [
+    ['Win rate (excl BE)', (100 * wins.length / (wins.length + losses.length)).toFixed(1) + '%', ''],
+    ['Expectancy / trade', fR(netR / rows.length), netR >= 0 ? 'pos' : 'neg'],
+    ['Avg win / avg loss', (exp(wins) / Math.abs(exp(losses))).toFixed(2), ''],
+    ['Max drawdown', fR(maxDD), 'neg'],
+    ['Violation rate', (100 * vio.length / rows.length).toFixed(0) + '%', ''],
+    ['Clean-trade expectancy', fR(exp(clean)), exp(clean) >= 0 ? 'pos' : 'neg'],
+    ['Violation expectancy', fR(exp(vio)), exp(vio) >= 0 ? 'pos' : 'neg'],
+  ];
+  document.getElementById('kpis').innerHTML = kpis.map(([l, v, c]) =>
+    `<div class="kpi"><div class="label">${l}</div><div class="value ${c}">${v}</div></div>`).join('');
+
+  charts.forEach(c => c.destroy()); charts = [];
+
+  /* hero monthly mini */
+  const mo = {};
+  rows.forEach(r => { const m = String(r.date).slice(0, 7); mo[m] = (mo[m] || 0) + r.r; });
+  const moKeys = Object.keys(mo).sort();
+  charts.push(new Chart(document.getElementById('heromonthly'), {
+    type: 'bar',
+    data: { labels: moKeys.map(m => m.slice(5)), datasets: [{ data: moKeys.map(m => mo[m]),
+      backgroundColor: moKeys.map(m => mo[m] >= 0 ? C.ink : 'rgba(24,24,27,.25)'),
+      borderRadius: 6, maxBarThickness: 26 }] },
+    options: { maintainAspectRatio: false,
+      plugins: { tooltip: { callbacks: { label: c => fR(c.parsed.y) } } },
+      scales: { y: { ticks: { callback: v => v + 'R' }, grid: { color: 'rgba(24,24,27,.06)' } },
+                x: { grid: { display: false } } } }
+  }));
+
+  /* gauge */
+  const pct = clean.length / rows.length;
+  charts.push(new Chart(document.getElementById('gauge'), {
+    type: 'doughnut',
+    data: { datasets: [{ data: [pct, 1 - pct],
+      backgroundColor: [C.ink, 'rgba(24,24,27,.12)'], borderWidth: 0 }] },
+    options: { maintainAspectRatio: false, cutout: '78%', rotation: -110, circumference: 220,
+      plugins: { tooltip: { enabled: false } } }
+  }));
+
+  /* equity */
+  charts.push(new Chart(document.getElementById('equitychart'), {
+    data: { labels: eq.map(e => e.d), datasets: [
+      { type: 'line', data: eq.map(e => e.v), borderColor: C.equity, borderWidth: 2,
+        pointRadius: 0, tension: .25, label: 'Equity (R)' },
+      { type: 'bar', data: eq.map(e => e.dd), backgroundColor: 'rgba(213,84,63,.22)',
+        borderWidth: 0, label: 'Drawdown', barPercentage: 1, categoryPercentage: 1 } ] },
+    options: { maintainAspectRatio: false, interaction: { mode: 'index', intersect: false },
+      plugins: { tooltip: { callbacks: { label: c => c.dataset.label + ': ' + fR(c.parsed.y) } } },
+      scales: { x: { grid: { display: false }, ticks: { maxTicksLimit: 9 } },
+                y: { ticks: { callback: v => v + 'R' } } } }
+  }));
+
+  /* discipline */
+  const disc = [['Compliant (' + clean.length + ')', exp(clean)],
+                ['Violated (' + vio.length + ')', exp(vio)]];
+  charts.push(new Chart(document.getElementById('disciplinechart'), {
+    type: 'bar',
+    data: { labels: disc.map(d => d[0]), datasets: [{ data: disc.map(d => d[1]), minBarLength: 4,
+      backgroundColor: disc.map(d => d[1] >= 0 ? C.profit : C.loss), borderRadius: 6 }] },
+    options: { indexAxis: 'y', maintainAspectRatio: false,
+      layout: { padding: { left: 6 } },
+      plugins: { tooltip: { callbacks: { label: c => 'expectancy ' + fR(c.parsed.x) } } },
+      scales: { x: { ticks: { callback: v => v + 'R' } },
+                y: { grid: { display: false }, ticks: { autoSkip: false, crossAlign: 'far' } } } }
+  }));
+
+  /* grade */
+  const gd = {};
+  rows.forEach(r => { (gd[gradeBucket(r.grade)] = gd[gradeBucket(r.grade)] || []).push(r); });
+  const gKeys = ['A', 'B', 'C', 'D'].filter(k => gd[k]);
+  charts.push(new Chart(document.getElementById('grade'), {
+    type: 'bar',
+    data: { labels: gKeys.map(k => k + ' (' + gd[k].length + ')'),
+      datasets: [{ data: gKeys.map(k => exp(gd[k])), borderRadius: 6,
+        backgroundColor: gKeys.map(k => exp(gd[k]) >= 0 ? C.profit : C.loss) }] },
+    options: { maintainAspectRatio: false,
+      plugins: { tooltip: { callbacks: { label: c => 'expectancy ' + fR(c.parsed.y) } } },
+      scales: { y: { ticks: { callback: v => v + 'R' } }, x: { grid: { display: false } } } }
+  }));
+
+  /* per-trade R */
+  charts.push(new Chart(document.getElementById('pertrade'), {
+    type: 'bar',
+    data: { labels: rows.map((r, i) => '#' + (i + 1) + ' ' + r.date),
+      datasets: [{ data: rows.map(r => r.r),
+        backgroundColor: rows.map(r => r.result === 'BE' ? 'rgba(24,24,27,.25)' : r.r >= 0 ? C.profit : C.loss),
+        barPercentage: .9, categoryPercentage: 1 }] },
+    options: { maintainAspectRatio: false,
+      plugins: { tooltip: { callbacks: { label: c => fR(c.parsed.y) } } },
+      scales: { x: { display: false }, y: { ticks: { callback: v => v + 'R' } } } }
+  }));
+
+  /* distribution */
+  const bins = { '≤ -1R': 0, '-1R to 0': 0, 'BE': 0, '0 to 1.5R': 0, '1.5R to 3R': 0, '> 3R': 0 };
+  rows.forEach(t => { const r = t.r;
+    if (t.result === 'BE') bins['BE']++;
+    else if (r <= -1) bins['≤ -1R']++; else if (r < 0) bins['-1R to 0']++;
+    else if (r <= 1.5) bins['0 to 1.5R']++; else if (r <= 3) bins['1.5R to 3R']++; else bins['> 3R']++; });
+  charts.push(new Chart(document.getElementById('rdist'), {
+    type: 'bar',
+    data: { labels: Object.keys(bins), datasets: [{ data: Object.values(bins), borderRadius: 6,
+      backgroundColor: [C.loss, C.loss, 'rgba(24,24,27,.25)', C.profit, C.profit, C.profit] }] },
+    options: { maintainAspectRatio: false,
+      scales: { y: { ticks: { precision: 0 } }, x: { grid: { display: false } } } }
+  }));
+
+  /* type: breakout vs range-bound */
+  const ty = {};
+  rows.forEach(r => { const k = r.type || 'Unlabelled'; (ty[k] = ty[k] || []).push(r); });
+  const tKeys = Object.keys(ty).sort((a, b) => exp(ty[b]) - exp(ty[a]));
+  const tNet = k => ty[k].reduce((s, r) => s + r.r, 0);
+  const tWr = k => {
+    const w = ty[k].filter(r => r.result === 'Win').length,
+          l = ty[k].filter(r => r.result === 'Loss').length;
+    return (w + l) ? 100 * w / (w + l) : 0;
+  };
+  charts.push(new Chart(document.getElementById('typechart'), {
+    type: 'bar',
+    data: { labels: tKeys.map(k => k + ' (' + ty[k].length + ')'),
+      datasets: [{ data: tKeys.map(k => exp(ty[k])), borderRadius: 6, minBarLength: 4,
+        backgroundColor: tKeys.map(k => exp(ty[k]) >= 0 ? C.profit : C.loss) }] },
+    options: { indexAxis: 'y', maintainAspectRatio: false,
+      layout: { padding: { left: 6 } },
+      plugins: { tooltip: { callbacks: {
+        label: c => ['expectancy ' + fR(c.parsed.x),
+                     'net ' + fR(tNet(tKeys[c.dataIndex])),
+                     'win rate ' + tWr(tKeys[c.dataIndex]).toFixed(0) + '%'] } } },
+      scales: { x: { ticks: { callback: v => v + 'R' } },
+                y: { grid: { display: false }, ticks: { autoSkip: false, crossAlign: 'far' } } } }
+  }));
+  charts.push(new Chart(document.getElementById('typewin'), {
+    type: 'bar',
+    data: { labels: tKeys.map(k => k + ' (' + ty[k].length + ')'),
+      datasets: [{ data: tKeys.map(tWr), borderRadius: 6,
+        backgroundColor: 'rgba(24,24,27,.75)' }] },
+    options: { maintainAspectRatio: false,
+      plugins: { tooltip: { callbacks: { label: c => c.parsed.y.toFixed(1) + '% win rate' } } },
+      scales: { y: { ticks: { callback: v => v + '%' }, suggestedMax: 60 },
+                x: { grid: { display: false } } } }
+  }));
+
+  /* table */
+  document.getElementById('logtable').innerHTML =
+    '<tr><th class="l">Date</th><th class="l">Dir</th><th class="l">Type</th><th class="l">Grade</th>' +
+    '<th>R</th><th>Violations</th><th class="l">Result</th></tr>' +
+    rows.slice().reverse().map(r => `<tr>
+      <td class="l">${r.date}</td><td class="l">${r.direction || ''}</td>
+      <td class="l">${r.type || ''}</td><td class="l">${r.grade || ''}</td>
+      <td class="${r.result === 'BE' ? 'be' : r.r >= 0 ? 'pos' : 'neg'}">${fR(r.r)}</td>
+      <td>${r.violations || 0}</td>
+      <td class="l"><span class="pill ${r.result.toLowerCase()}">${r.result}</span></td></tr>`).join('');
+}
+
+/* ---------- loaders ---------- */
+function loadEmbedded() {
+  document.getElementById('fname').textContent = 'my journal · embedded';
+  analyse(Papa.parse(MY_JOURNAL, { header: true, skipEmptyLines: true }).data);
+}
+loadEmbedded();
+document.getElementById('reload').addEventListener('click', e => { e.preventDefault(); loadEmbedded(); });
+
+function fromMasterSheet(wb) {
+  const raw = XLSX.utils.sheet_to_json(wb.Sheets['Master'], { header: 1, cellDates: true });
+  const out = [];
+  for (const row of raw.slice(1)) {
+    const [month, direction, date, no, result, r, v1, v2, v3, v4, v5, type, grade] = row;
+    if (!(date instanceof Date) || !['Win', 'Loss', 'BE'].includes(result)) continue;
+    out.push({ date: date.toISOString().slice(0, 10), direction, result, r,
+      violations: [v1, v2, v3, v4, v5].filter(Boolean).length, type, grade });
+  }
+  return out;
+}
+
+document.getElementById('csv').addEventListener('change', e => {
+  const f = e.target.files[0]; if (!f) return;
+  document.getElementById('fname').textContent = f.name;
+  if (/\.xlsx?$|\.xls$/i.test(f.name)) {
+    const reader = new FileReader();
+    reader.onload = ev => {
+      const wb = XLSX.read(ev.target.result, { cellDates: true });
+      if (wb.SheetNames.includes('Master')) { analyse(fromMasterSheet(wb)); return; }
+      analyse(XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { defval: '' }));
+    };
+    reader.readAsArrayBuffer(f);
+  } else {
+    Papa.parse(f, { header: true, skipEmptyLines: true, complete: res => analyse(res.data) });
+  }
+});
+
+/* ---------- sidebar toggle ---------- */
+document.getElementById('navtoggle').addEventListener('click', () =>
+  document.body.classList.toggle('nav-hidden'));
+if (matchMedia('(max-width: 980px)').matches) document.body.classList.add('nav-hidden');
+</script>
+</body>
+</html>
