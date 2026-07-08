@@ -11,7 +11,7 @@ What it does:
     3. Validates the data:
          - flags trades whose date cell disagrees with their Month label
          - flags missing/invalid R values or results
-    4. Writes a clean nathan_journal.csv
+    4. Writes a clean journal.csv
     5. Rewrites the embedded data block inside dashboard.html
 
 Requires: pip install openpyxl
@@ -72,7 +72,7 @@ def main():
     if not trades: sys.exit("No valid trades found in the Master sheet.")
 
     # write CSV
-    csv_path = Path(__file__).parent / 'nathan_journal.csv'
+    csv_path = Path(__file__).parent / 'journal.csv'
     with open(csv_path, 'w', newline='') as f:
         w = csv.DictWriter(f, fieldnames=trades[0].keys())
         w.writeheader(); w.writerows(trades)

@@ -44,7 +44,7 @@ to 8 and put one trade in the wrong month.
 
 | File | What it does |
 |---|---|
-| `nathan_journal.csv` | Per-trade extract from the workbook |
+| `journal.csv` | Per-trade extract from the workbook |
 | `analysis.sql` | 10 SQLite queries: headline stats, payoff, compliance split, grade expectancy, monthly breakdowns, equity/drawdown (window functions), losing streaks |
 | `update_data.py` | Reads the workbook's Master sheet, validates dates, rewrites the CSV and the dashboard's embedded data |
 | `dashboard.html` | Single-file dashboard (Chart.js + SheetJS); opens with the data embedded, can load the original .xlsx or a CSV |
