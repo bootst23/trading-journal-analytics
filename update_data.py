@@ -20,6 +20,7 @@ Requires: pip install openpyxl
 """
 import sys, re, csv, sqlite3, datetime
 from pathlib import Path
+from decimal import Decimal, ROUND_HALF_UP
 
 try:
     import openpyxl
@@ -83,13 +84,13 @@ def replace_embed(html, embed):
 
 def summarise(trades):
     """Headline figures, computed once and reused by the printout and the tests."""
-    net = sum(t['r'] for t in trades)
+    net = sum(Decimal(str(t['r'])) for t in trades)
     wins = sum(t['result'] == 'Win' for t in trades)
     losses = sum(t['result'] == 'Loss' for t in trades)
     decided = wins + losses
     return {
         'trades': len(trades),
-        'net_r': round(net, 2),
+        'net_r': float(net.quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)),
         'win_rate': round(100 * wins / decided, 1) if decided else 0.0,
         'first_date': trades[0]['date'] if trades else None,
         'last_date': trades[-1]['date'] if trades else None,

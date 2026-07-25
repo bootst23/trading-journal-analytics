@@ -256,3 +256,8 @@ def test_committed_journal_reproduces_the_published_headline_figures():
     viol = [t for t in trades if int(t['violations']) > 0]
     assert (len(clean), round(sum(t['r'] for t in clean), 1)) == (51, 17.1)
     assert (len(viol), round(sum(t['r'] for t in viol), 1)) == (30, -23.8)
+
+def test_net_r_rounds_half_up_deterministically():
+    """-6.665 must round to -6.67 on every interpreter, not bankers'-round to -6.66."""
+    trades = [{'r': -3.3325, 'result': 'Loss'}, {'r': -3.3325, 'result': 'Loss'}]
+    assert summarise(trades)['net_r'] == -6.67
