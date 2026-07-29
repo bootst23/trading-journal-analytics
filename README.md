@@ -1,32 +1,32 @@
-# Trading Journal Analytics
+﻿# Trading Journal Analytics
 
 SQL and dashboard analysis of my own trading journal. 81 crypto futures trades
-(BTC/ETH/SOL), Feb–Jun 2026, logged in Excel with direction, result, R-multiple,
+(BTC/ETH/SOL), Feb-Jun 2026, logged in Excel with direction, result, R-multiple,
 a setup grade (A+ to D) assigned before entry, five rule-violation flags, and
 trade type.
 
 ## Stats
 
 Overall:
-- 81 trades, net −6.7R
+- 81 trades, net -6.7R
 - Win rate 28.0% (excl. break-even)
-- Avg win +2.06R, avg loss −0.92R (payoff 2.2)
-- Expectancy −0.08R per trade
-- Max drawdown −18.5R, longest losing streak 7
+- Avg win +2.06R, avg loss -0.92R (payoff 2.2)
+- Expectancy -0.08R per trade
+- Max drawdown -18.5R, longest losing streak 7
 
 By rule compliance:
 - 0 violations, 51 trades: +17.1R total, +0.34R per trade
-- 1+ violations, 30 trades: −23.8R total, −0.79R per trade
+- 1+ violations, 30 trades: -23.8R total, -0.79R per trade
 
 By setup grade (assigned at entry, before the outcome was known):
 - A, 6 trades: +8.6R, +1.44R per trade, 67% win rate
-- B, 44 trades: −8.8R, −0.20R per trade, 28%
-- C, 26 trades: −2.0R, −0.08R per trade, 24%
-- D, 5 trades: −4.5R, −0.90R per trade, 0%
+- B, 44 trades: -8.8R, -0.20R per trade, 28%
+- C, 26 trades: -2.0R, -0.08R per trade, 24%
+- D, 5 trades: -4.5R, -0.90R per trade, 0%
 
 By trade type:
 - Breakout, 51 trades: +0.03R total
-- Range-bound, 30 trades: −6.7R total
+- Range-bound, 30 trades: -6.7R total
 
 ## What the numbers say
 
@@ -51,11 +51,11 @@ to 8 and put one trade in the wrong month.
 
 ## Run it
 
-Open `dashboard.html` in a browser. To load fresh data, click *Load journal* — it
+Open `dashboard.html` in a browser. To load fresh data, click *Load journal* - it
 takes the original `.xlsx` workbook or a CSV with columns:
 `date, direction, result (Win/Loss/BE), r, violations, type, grade`.
 
-For the SQL, see the setup block at the top of `analysis.sql` — create the typed
+For the SQL, see the setup block at the top of `analysis.sql` - create the typed
 table first, since importing into a new table makes every column TEXT and breaks
 numeric comparisons.
 

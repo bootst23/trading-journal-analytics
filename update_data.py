@@ -1,6 +1,6 @@
-#!/usr/bin/env python3
+﻿#!/usr/bin/env python3
 """
-update_data.py — refresh the trading dashboard from the journal workbook.
+update_data.py - refresh the trading dashboard from the journal workbook.
 
 Usage:
     python update_data.py Trading_Months_Stats.xlsx
@@ -54,7 +54,7 @@ class PipelineError(Exception):
 
 
 # --------------------------------------------------------------------------
-# Pure functions — no file I/O, no sys.exit. These are the tested core.
+# Pure functions - no file I/O, no sys.exit. These are the tested core.
 # --------------------------------------------------------------------------
 
 def build_embed(trades):
@@ -72,7 +72,7 @@ def replace_embed(html, embed):
     duplicated anchor can never silently corrupt the dashboard.
     """
     if '`' in embed:
-        raise PipelineError("Embed data contains a backtick — it would break the JS template literal.")
+        raise PipelineError("Embed data contains a backtick - it would break the JS template literal.")
     new_html, n = re.subn(EMBED_PATTERN,
                           lambda _: 'const MY_JOURNAL = `' + embed + '`;',
                           html)
@@ -114,12 +114,12 @@ def extract(xlsx_path):
         if not isinstance(date, datetime.datetime) or result not in ('Win', 'Loss', 'BE'):
             continue
         if not isinstance(r, (int, float)):
-            warnings.append(f"  ! {date.date()} trade #{no}: R value '{r}' is not numeric — skipped")
+            warnings.append(f"  ! {date.date()} trade #{no}: R value '{r}' is not numeric - skipped")
             continue
         label_m = MONTHS.get(str(month).strip().lower())
         if label_m and date.month != label_m:
             boundary = (date + datetime.timedelta(days=1)).month == label_m
-            tag = "boundary?" if boundary else "CHECK — possible typo"
+            tag = "boundary?" if boundary else "CHECK - possible typo"
             warnings.append(f"  ! {date.date()} trade #{no}: dated {date.strftime('%B')} "
                             f"but labelled '{month}' ({tag})")
         trades.append({

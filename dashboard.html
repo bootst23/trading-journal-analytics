@@ -1,9 +1,9 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Trade Journal — Nathan Yap</title>
+<title>Trade Journal - Nathan Yap</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
@@ -127,7 +127,7 @@
   <a href="#log"><svg viewBox="0 0 24 24"><path d="M4 5h16M4 12h16M4 19h10"/></svg>Trade log</a>
   <div class="navlabel">Data</div>
   <a href="#" id="reload"><svg viewBox="0 0 24 24"><path d="M4 4v6h6M20 20v-6h-6M5.5 9A8 8 0 0119 7.5M18.5 15A8 8 0 015 16.5"/></svg>Reset to my journal</a>
-  <div class="foot">Nathan Yap · Feb–Jun 2026<br>81 trades · crypto derivatives</div>
+  <div class="foot">Nathan Yap · Feb-Jun 2026<br>81 trades · crypto derivatives</div>
 </aside>
 
 <main id="top">
@@ -136,7 +136,7 @@
       <svg viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h16"/></svg></button>
     <div>
       <div style="font-weight:700; font-size:16px; letter-spacing:-.01em">Performance overview</div>
-      <div class="range mono" id="range">—</div>
+      <div class="range mono" id="range">-</div>
     </div>
     <div class="spacer"></div>
     <span class="fname" id="fname">my journal · embedded</span>
@@ -147,16 +147,16 @@
   <section class="hero">
     <div><h3>Net R by month</h3><div class="mini"><canvas id="heromonthly"></canvas></div></div>
     <div class="gauge"><canvas id="gauge"></canvas>
-      <div class="center"><div class="pct" id="gaugepct">—</div><div class="cap">rule-compliant trades</div></div></div>
+      <div class="center"><div class="pct" id="gaugepct">-</div><div class="cap">rule-compliant trades</div></div></div>
     <div class="stat">
-      <div class="num" id="stat-trades">—</div>
+      <div class="num" id="stat-trades">-</div>
       <div class="cap">trades journaled</div>
-      <div class="detail" id="stat-streak">—</div>
+      <div class="detail" id="stat-streak">-</div>
     </div>
     <div class="stat">
-      <div class="num" id="stat-net">—</div>
+      <div class="num" id="stat-net">-</div>
       <div class="cap">net result</div>
-      <div class="detail" id="stat-clean">—</div>
+      <div class="detail" id="stat-clean">-</div>
     </div>
   </section>
 
@@ -170,7 +170,7 @@
 
   <div class="grid2" id="discipline">
     <div class="card"><h2>Discipline</h2>
-      <div class="sub">expectancy per trade — rule-compliant vs violation trades</div>
+      <div class="sub">expectancy per trade - rule-compliant vs violation trades</div>
       <canvas id="disciplinechart"></canvas></div>
     <div class="card"><h2>Expectancy by setup grade</h2>
       <div class="sub">grade assigned at entry vs realised R per trade</div>
@@ -309,7 +309,7 @@ function analyse(rows) {
   rows = rows.filter(r => r.date && r.result && !isNaN(parseFloat(r.r)))
              .map(r => ({ ...r, r: parseFloat(r.r), violations: parseInt(r.violations) || 0 }))
              .sort((a, b) => String(a.date).localeCompare(String(b.date)));
-  if (!rows.length) { alert('No valid rows found — see footer for expected columns.'); return; }
+  if (!rows.length) { alert('No valid rows found - see footer for expected columns.'); return; }
 
   const wins = rows.filter(r => r.result === 'Win'),
         losses = rows.filter(r => r.result === 'Loss');

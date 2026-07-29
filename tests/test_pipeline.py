@@ -1,4 +1,4 @@
-"""Tests for update_data.py — the pipeline that feeds the dashboard and the SQL.
+﻿"""Tests for update_data.py - the pipeline that feeds the dashboard and the SQL.
 
 Design notes:
   * The real trading workbook is never used here. Every test that needs a
@@ -63,7 +63,7 @@ def sample_trades():
 
 
 # ==========================================================================
-# build_embed — 4 tests
+# build_embed - 4 tests
 # ==========================================================================
 
 def test_embed_header_is_the_documented_seven_columns(sample_trades):
@@ -91,7 +91,7 @@ def test_embed_round_trips_through_a_csv_reader(sample_trades):
 
 
 # ==========================================================================
-# replace_embed — 5 tests
+# replace_embed - 5 tests
 # ==========================================================================
 
 HTML = ('<html><script>\n'
@@ -129,7 +129,7 @@ def test_replace_embed_rejects_a_backtick_in_the_data():
 
 
 # ==========================================================================
-# extract — 6 tests
+# extract - 6 tests
 # ==========================================================================
 
 def test_extract_reads_valid_rows(tmp_path):
@@ -194,7 +194,7 @@ def test_extract_counts_violations_across_all_five_flags(tmp_path):
 
 
 # ==========================================================================
-# load_database — 4 tests
+# load_database - 4 tests
 # ==========================================================================
 
 @pytest.fixture
@@ -241,7 +241,7 @@ def test_load_database_is_rerunnable_without_duplicating_rows(loaded_db):
 
 
 # ==========================================================================
-# regression guard — 1 test
+# regression guard - 1 test
 # ==========================================================================
 
 def test_committed_journal_reproduces_the_published_headline_figures():
