@@ -1,8 +1,8 @@
--- ============================================================
--- Trading Journal Analysis (SQLite) — R-multiple based
+﻿-- ============================================================
+-- Trading Journal Analysis (SQLite) - R-multiple based
 -- Author: Nathan Yap Hao Kang
 --
--- Setup (typed table first — a raw .import makes every column
+-- Setup (typed table first - a raw .import makes every column
 -- TEXT and silently breaks numeric comparisons):
 --
 --   sqlite3 journal.db
