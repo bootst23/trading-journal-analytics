@@ -9,10 +9,12 @@ Usage:
 
 What it does:
     1. Reads the 'Master' sheet from the workbook
-    2. Extracts one row per trade (date, direction, result, R, violations, type, grade)
+    2. Extracts one row per trade (date, direction, result, R, the eight violation
+       flags, type, setup and execution grade, minutes in trade and in drawdown)
     3. Validates the data:
          - flags trades whose date cell disagrees with their Month label
          - flags missing/invalid R values or results
+         - flags durations it cannot read (the field is left blank)
     4. Writes a clean journal.csv
     5. Rewrites the embedded data block inside dashboard.html
     6. Optionally loads journal.csv into a typed SQLite database (journal.db)
@@ -34,23 +36,31 @@ MONTHS = {'january':1,'february':2,'march':3,'april':4,'may':5,'june':6,
 # The CSV column order. The SQLite schema below must stay in the same order,
 # because sqlite's .import (and our INSERT) are positional.
 FIELDNAMES = ['date', 'direction', 'trade_no', 'result', 'r',
-              'v1', 'v2', 'v3', 'v4', 'violations', 'type', 'grade', 'mins_in_trade']
+              'v1', 'v2', 'v3', 'v4', 'v5', 'v6', 'v7', 'v8', 'violations',
+              'type', 'grade', 'exec_grade', 'mins_in_trade', 'mins_in_drawdown']
 
 SCHEMA = """CREATE TABLE trades (
-    date TEXT, direction TEXT, trade_no INTEGER,
-    result TEXT, r REAL, v1 TEXT, v2 TEXT, v3 TEXT, v4 TEXT,
-    violations INTEGER, type TEXT, grade TEXT, mins_in_trade REAL)"""
+    date TEXT, direction TEXT, trade_no INTEGER, result TEXT, r REAL,
+    v1 INTEGER, v2 INTEGER, v3 INTEGER, v4 INTEGER,
+    v5 INTEGER, v6 INTEGER, v7 INTEGER, v8 INTEGER, violations INTEGER,
+    type TEXT, grade TEXT, exec_grade TEXT, mins_in_trade INTEGER, mins_in_drawdown INTEGER)"""
 
-# The 7 columns the dashboard actually consumes.
-EMBED_COLUMNS = ['date', 'direction', 'result', 'r', 'violations', 'type', 'grade']
+# The columns the dashboard actually consumes.
+EMBED_COLUMNS = ['date', 'trade_no', 'direction', 'result', 'r', 'violations', 'type', 'grade',
+                 'exec_grade', 'mins_in_trade', 'mins_in_drawdown']
 
 EMBED_PATTERN = r'const MY_JOURNAL = `[^`]*`;'
 
 # Master sheet headers extract() needs, matched by text (trimmed), not position.
-# V1-V4 are required because journal.csv writes them; V5-V8 are counted if present.
-REQUIRED_HEADERS = ['Month', 'Direction', 'Date', 'Trade No.', 'Result', 'R',
-                    'V1', 'V2', 'V3', 'V4', 'Type', 'Setup Grade']
+# 'D. helper' is deliberately not read: it is a second copy of the drawdown
+# minutes and has drifted out of line with 'D. in drawdown'.
 V_HEADERS = [f'V{i}' for i in range(1, 9)]
+REQUIRED_HEADERS = ['Month', 'Direction', 'Date', 'Trade No.', 'Result', 'R', *V_HEADERS,
+                    'Type', 'Setup Grade', 'Execution Grade', 'D. in trade', 'D. in drawdown']
+DURATION_FIELDS = {'mins_in_trade': 'D. in trade', 'mins_in_drawdown': 'D. in drawdown'}
+
+# '1d 10h 59m', '3h', '15m', '18h29m': each part optional, spaces optional.
+DURATION_PATTERN = re.compile(r'(?:(\d+)d)?\s*(?:(\d+)h)?\s*(?:(\d+)m)?')
 
 
 class PipelineError(Exception):
@@ -64,8 +74,25 @@ class PipelineError(Exception):
 # Pure functions - no file I/O, no sys.exit. These are the tested core.
 # --------------------------------------------------------------------------
 
+def parse_duration(value):
+    """Turn '1d 10h 59m', '3h', '15m', '18h29m', '0', '0m' or 0 into whole minutes.
+
+    Raises ValueError for anything else (blank, unreadable text, other numbers).
+    """
+    if isinstance(value, (int, float)) and not isinstance(value, bool) and value == 0:
+        return 0
+    text = value.strip() if isinstance(value, str) else ''
+    if text == '0':
+        return 0
+    match = DURATION_PATTERN.fullmatch(text)
+    if not match or not any(match.groups()):
+        raise ValueError(f"unreadable duration: {value!r}")
+    days, hours, mins = (int(g or 0) for g in match.groups())
+    return days * 24 * 60 + hours * 60 + mins
+
+
 def build_embed(trades):
-    """Turn trade dicts into the 7-column CSV text the dashboard embeds."""
+    """Turn trade dicts into the CSV text the dashboard embeds (EMBED_COLUMNS)."""
     lines = [','.join(EMBED_COLUMNS)]
     for t in trades:
         lines.append(','.join(str(t[c]) for c in EMBED_COLUMNS))
@@ -120,13 +147,12 @@ def extract(xlsx_path):
     missing = [h for h in REQUIRED_HEADERS if h not in col]
     if missing:
         raise PipelineError(f"Master sheet is missing required header(s): {', '.join(missing)}")
-    v_idx = [col[h] for h in V_HEADERS if h in col]
     trades, warnings = [], []
 
     for row in ws.iter_rows(min_row=2, values_only=True):
         month, direction, date, no, result, r = (row[col[h]] for h in REQUIRED_HEADERS[:6])
-        v1, v2, v3, v4 = (row[col[h]] for h in V_HEADERS[:4])
         ttype, grade = row[col['Type']], row[col['Setup Grade']]
+        exec_grade = row[col['Execution Grade']]
         if not isinstance(date, datetime.datetime) or result not in ('Win', 'Loss', 'BE'):
             continue
         if not isinstance(r, (int, float)):
@@ -138,12 +164,23 @@ def extract(xlsx_path):
             tag = "boundary?" if boundary else "CHECK - possible typo"
             warnings.append(f"  ! {date.date()} trade #{no}: dated {date.strftime('%B')} "
                             f"but labelled '{month}' ({tag})")
+        # SQLite has no boolean type; 1/0 can be added up.
+        flags = {f'v{i}': int(bool(row[col[f'V{i}']])) for i in range(1, 9)}
+        minutes = {}
+        for field, header in DURATION_FIELDS.items():
+            try:
+                minutes[field] = parse_duration(row[col[header]])
+            except ValueError:
+                minutes[field] = ''
+                warnings.append(f"  ! {date.date()} trade #{no}: '{header}' value "
+                                f"{row[col[header]]!r} is unreadable - left blank")
         trades.append({
             'date': date.strftime('%Y-%m-%d'), 'direction': direction,
             'trade_no': no, 'result': result, 'r': r,
-            'v1': bool(v1), 'v2': bool(v2), 'v3': bool(v3), 'v4': bool(v4),
-            'violations': sum(bool(row[i]) for i in v_idx),
-            'type': ttype, 'grade': grade, 'mins_in_trade': '',
+            **flags, 'violations': sum(flags.values()),
+            'type': ttype, 'grade': grade,
+            'exec_grade': '' if exec_grade is None else str(exec_grade).strip(),
+            **minutes,
         })
 
     trades.sort(key=lambda t: (t['date'], int(t['trade_no'])))
@@ -151,7 +188,7 @@ def extract(xlsx_path):
 
 
 def write_csv(trades, csv_path):
-    """Write the full 13-column extract."""
+    """Write the full extract, one column per FIELDNAMES entry."""
     with open(csv_path, 'w', newline='') as f:
         w = csv.DictWriter(f, fieldnames=FIELDNAMES)
         w.writeheader()
@@ -164,7 +201,8 @@ def load_database(csv_path, db_path):
 
     The table is created explicitly before loading. Letting sqlite infer the
     schema types every column TEXT, which silently breaks numeric comparisons
-    like `WHERE r < 0`.
+    like `WHERE r < 0`. Blank cells, and columns an older CSV does not have,
+    are stored as NULL so AVG() skips them instead of counting them as 0.
     """
     db_path = Path(db_path)
     if db_path.exists():
@@ -173,7 +211,7 @@ def load_database(csv_path, db_path):
     try:
         con.execute(SCHEMA)
         with open(csv_path, newline='') as f:
-            rows = [[row[c] for c in FIELDNAMES] for row in csv.DictReader(f)]
+            rows = [[row.get(c) or None for c in FIELDNAMES] for row in csv.DictReader(f)]
         placeholders = ','.join('?' * len(FIELDNAMES))
         con.executemany(f"INSERT INTO trades VALUES ({placeholders})", rows)
         con.commit()

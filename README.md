@@ -57,6 +57,13 @@ trade's result as a multiple of the amount risked.
   its lowest value.
 - **Longest losing streak**: the most losses in a row. A win or a break-even ends
   a streak.
+- **Average time in trade / in drawdown**: the mean of "D. in trade" / "D. in
+  drawdown" in minutes, for winners and for losers separately. Break-even trades
+  are left out, and trades with no readable time are skipped, not counted as 0.
+  Shown as hours and minutes, with the number of trades averaged.
+- **Execution-grade stats**: only trades that have an execution grade, grouped by
+  its letter: win rate (break-even excluded) and average R per trade, labelled with
+  the number of graded trades.
 - **Rounding**: figures are rounded half away from zero, so -6.665 shows as -6.67,
   the same in Python, SQL and the dashboard.
 

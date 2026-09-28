@@ -23,7 +23,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from update_data import (  # noqa: E402
     PipelineError, build_embed, replace_embed, summarise,
-    extract, write_csv, load_database, FIELDNAMES, EMBED_COLUMNS,
+    extract, write_csv, load_database, parse_duration, FIELDNAMES, EMBED_COLUMNS,
 )
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
@@ -52,19 +52,22 @@ def make_workbook(path, rows, sheet_name='Master', header=HEADER):
 
 
 def trade_row(month='February', direction='Long', date=None, no=1, result='Win',
-              r=2.0, flags=(None,) * 8, ttype='Breakout', grade='B+'):
+              r=2.0, flags=(None,) * 8, ttype='Breakout', grade='B+',
+              exec_grade=None, in_trade='1h 5m', in_drawdown='20m', helper=None):
     date = date or datetime.datetime(2026, 2, 5)
     return [month, direction, date, no, result, r, *flags, ttype, grade,
-            'Exec-A', None, None, None]
+            exec_grade, in_trade, in_drawdown, helper]
 
 
 @pytest.fixture
 def sample_trades():
     return [
-        {'date': '2026-02-05', 'direction': 'Short', 'result': 'Win', 'r': 1.72,
-         'violations': 0, 'type': 'Breakout', 'grade': 'B+'},
-        {'date': '2026-02-06', 'direction': 'Long', 'result': 'Loss', 'r': -1,
-         'violations': 2, 'type': 'Range-Bound', 'grade': 'C'},
+        {'date': '2026-02-05', 'trade_no': 1, 'direction': 'Short', 'result': 'Win', 'r': 1.72,
+         'violations': 0, 'type': 'Breakout', 'grade': 'B+', 'exec_grade': 'A',
+         'mins_in_trade': 65, 'mins_in_drawdown': 20},
+        {'date': '2026-02-06', 'trade_no': 2, 'direction': 'Long', 'result': 'Loss', 'r': -1,
+         'violations': 2, 'type': 'Range-Bound', 'grade': 'C', 'exec_grade': '',
+         'mins_in_trade': '', 'mins_in_drawdown': 0},
     ]
 
 
@@ -72,9 +75,10 @@ def sample_trades():
 # build_embed - 4 tests
 # ==========================================================================
 
-def test_embed_header_is_the_documented_seven_columns(sample_trades):
+def test_embed_header_is_the_documented_embed_columns(sample_trades):
     header = build_embed(sample_trades).splitlines()[0]
-    assert header == 'date,direction,result,r,violations,type,grade'
+    assert header == ('date,trade_no,direction,result,r,violations,type,grade,'
+                      'exec_grade,mins_in_trade,mins_in_drawdown')
     assert header.split(',') == EMBED_COLUMNS
 
 
@@ -84,7 +88,7 @@ def test_embed_has_one_line_per_trade_plus_header(sample_trades):
 
 def test_embed_writes_field_values_in_column_order(sample_trades):
     first_data_line = build_embed(sample_trades).splitlines()[1]
-    assert first_data_line == '2026-02-05,Short,Win,1.72,0,Breakout,B+'
+    assert first_data_line == '2026-02-05,1,Short,Win,1.72,0,Breakout,B+,A,65,20'
 
 
 def test_embed_round_trips_through_a_csv_reader(sample_trades):
@@ -94,6 +98,7 @@ def test_embed_round_trips_through_a_csv_reader(sample_trades):
     assert parsed[0]['date'] == '2026-02-05'
     assert float(parsed[1]['r']) == -1
     assert int(parsed[1]['violations']) == 2
+    assert parsed[1]['mins_in_trade'] == ''          # blank stays blank, not 0
 
 
 # ==========================================================================
@@ -135,7 +140,7 @@ def test_replace_embed_rejects_a_backtick_in_the_data():
 
 
 # ==========================================================================
-# extract - 8 tests
+# extract - 14 tests
 # ==========================================================================
 
 def test_extract_reads_valid_rows(tmp_path):
@@ -223,19 +228,64 @@ def test_extract_raises_naming_missing_required_headers(tmp_path):
         extract(book)
 
 
+@pytest.mark.parametrize('value, minutes', [
+    ('1d 10h 59m', 2099), ('3h', 180), ('15m', 15), ('18h29m', 1109),
+    ('0', 0), ('0m', 0), (0, 0)])
+def test_parse_duration_reads_days_hours_and_minutes(value, minutes):
+    assert parse_duration(value) == minutes
+
+
+@pytest.mark.parametrize('value', ['', None, 'soon', '3 hours', 5])
+def test_parse_duration_rejects_anything_else(value):
+    with pytest.raises(ValueError):
+        parse_duration(value)
+
+
+def test_extract_stores_durations_as_whole_minutes(tmp_path):
+    rows = [trade_row(in_trade='1d 10h 59m', in_drawdown='18h29m', helper='999')]
+    trades, warnings = extract(make_workbook(tmp_path / 'b.xlsx', rows))
+    assert (trades[0]['mins_in_trade'], trades[0]['mins_in_drawdown']) == (2099, 1109)
+    assert warnings == []             # D. helper is ignored, whatever it holds
+
+
+def test_extract_warns_and_blanks_an_unreadable_duration(tmp_path):
+    rows = [trade_row(no=4, in_trade='soon')]
+    trades, warnings = extract(make_workbook(tmp_path / 'b.xlsx', rows))
+    assert len(trades) == 1                          # kept, not dropped
+    assert trades[0]['mins_in_trade'] == ''
+    assert trades[0]['mins_in_drawdown'] == 20       # the other field is still read
+    assert len(warnings) == 1
+    assert '2026-02-05' in warnings[0] and '#4' in warnings[0] and 'D. in trade' in warnings[0]
+
+
+def test_extract_leaves_a_blank_execution_grade_blank(tmp_path):
+    rows = [trade_row(no=1, exec_grade=None), trade_row(no=2, exec_grade='  '),
+            trade_row(no=3, exec_grade='B')]
+    trades, _ = extract(make_workbook(tmp_path / 'b.xlsx', rows))
+    assert [t['exec_grade'] for t in trades] == ['', '', 'B']
+
+
+def test_extract_stores_all_eight_flags_as_1_or_0(tmp_path):
+    rows = [trade_row(flags=('x', None, None, None, None, None, None, 'x'))]
+    trades, _ = extract(make_workbook(tmp_path / 'b.xlsx', rows))
+    assert [trades[0][f'v{i}'] for i in range(1, 9)] == [1, 0, 0, 0, 0, 0, 0, 1]
+
+
 # ==========================================================================
-# load_database - 5 tests
+# load_database - 7 tests
 # ==========================================================================
 
 @pytest.fixture
 def loaded_db(tmp_path):
     trades = [
         {'date': '2026-02-05', 'direction': 'Short', 'trade_no': 1,
-         'result': 'Win', 'r': 1.72, 'v1': False, 'v2': False, 'v3': False, 'v4': False,
-         'violations': 0, 'type': 'Breakout', 'grade': 'B+', 'mins_in_trade': ''},
+         'result': 'Win', 'r': 1.72, **{f'v{i}': 0 for i in range(1, 9)},
+         'violations': 0, 'type': 'Breakout', 'grade': 'B+', 'exec_grade': 'A',
+         'mins_in_trade': 65, 'mins_in_drawdown': 20},
         {'date': '2026-02-06', 'direction': 'Long', 'trade_no': 2,
-         'result': 'Loss', 'r': -1.0, 'v1': True, 'v2': False, 'v3': False, 'v4': False,
-         'violations': 1, 'type': 'Range-Bound', 'grade': 'C', 'mins_in_trade': ''},
+         'result': 'Loss', 'r': -1.0, **{f'v{i}': int(i == 1) for i in range(1, 9)},
+         'violations': 1, 'type': 'Range-Bound', 'grade': 'C', 'exec_grade': '',
+         'mins_in_trade': '', 'mins_in_drawdown': 0},
     ]
     csv_path = write_csv(trades, tmp_path / 'journal.csv')
     db_path = tmp_path / 'journal.db'
@@ -261,6 +311,26 @@ def test_load_database_stores_violations_as_an_integer(loaded_db):
     db_path, _, _ = loaded_db
     con = sqlite3.connect(db_path)
     assert con.execute("SELECT typeof(violations) FROM trades LIMIT 1").fetchone()[0] == 'integer'
+    con.close()
+
+
+def test_load_database_stores_a_blank_as_null_not_zero(loaded_db):
+    """AVG() skips NULL but would count a 0; a real 0 (no drawdown) must stay 0."""
+    db_path, _, _ = loaded_db
+    con = sqlite3.connect(db_path)
+    row = con.execute("SELECT mins_in_trade, mins_in_drawdown, exec_grade "
+                      "FROM trades WHERE trade_no = 2").fetchone()
+    assert row == (None, 0, None)
+    assert con.execute("SELECT AVG(mins_in_trade) FROM trades").fetchone()[0] == 65
+    con.close()
+
+
+def test_load_database_stores_flags_as_integers(loaded_db):
+    db_path, _, _ = loaded_db
+    con = sqlite3.connect(db_path)
+    assert con.execute("SELECT typeof(v1), v1, v8 FROM trades WHERE trade_no = 2").fetchone() == (
+        'integer', 1, 0)
+    assert con.execute("SELECT SUM(v1) FROM trades").fetchone()[0] == 1
     con.close()
 
 
@@ -302,16 +372,21 @@ def test_committed_journal_reproduces_the_published_headline_figures():
     assert (len(viol), round(sum(t['r'] for t in viol), 1)) == (30, -23.8)
 
 
+RERUN = ("Rerun `python update_data.py <workbook>` to regenerate both; "
+         "do not edit either by hand.")
+
+
 def test_dashboard_embed_matches_committed_journal_csv():
     """dashboard.html's MY_JOURNAL block must be exactly what journal.csv produces."""
-    trades = list(csv.DictReader(open(REPO_ROOT / 'journal.csv', newline='')))
-    expected = build_embed(trades)
+    reader = csv.DictReader(open(REPO_ROOT / 'journal.csv', newline=''))
+    missing = [c for c in EMBED_COLUMNS if c not in reader.fieldnames]
+    assert not missing, f"journal.csv has no {', '.join(missing)} column(s). " + RERUN
+    expected = build_embed(list(reader))
     html = (REPO_ROOT / 'dashboard.html').read_text(encoding='utf-8')
     blocks = re.findall(r'const MY_JOURNAL = `([^`]*)`;', html)
     assert len(blocks) == 1, f"expected 1 MY_JOURNAL block in dashboard.html, found {len(blocks)}"
-    assert blocks[0] == expected, (
-        "dashboard.html's embedded data does not match journal.csv. Rerun "
-        "`python update_data.py <workbook>` to regenerate both; do not edit either by hand.")
+    assert blocks[0] == expected, "dashboard.html's embedded data does not match journal.csv. " + RERUN
+
 
 def test_net_r_rounds_half_up_deterministically():
     """-6.665 must round to -6.67 on every interpreter, not bankers'-round to -6.66."""

@@ -103,6 +103,7 @@
   .pill.loss { background: #fbe9e4; color: var(--loss); }
   .pill.be { background: #ececec; color: var(--muted); }
   .table-wrap { overflow: auto; max-height: 430px; }
+  td .n { color: var(--muted); font-size: 11px; }
   footer { color: var(--muted); font-size: 12px; line-height: 1.7; margin-top: 22px; }
 </style>
 </head>
@@ -176,6 +177,15 @@
     <div class="card"><h2>Win rate by type</h2>
       <div class="sub">wins as a share of decided trades (excl. break-even)</div>
       <canvas id="typewin"></canvas></div>
+  </div>
+
+  <div class="grid2">
+    <div class="card"><h2>Time in trade</h2>
+      <div class="sub">average per trade, winners vs losers · break-even excluded · (trades with a time)</div>
+      <table id="timetable"></table></div>
+    <div class="card"><h2>Execution grade</h2>
+      <div class="sub" id="execsub">-</div>
+      <table id="exectable"></table></div>
   </div>
 
   <div class="card">
@@ -289,10 +299,14 @@ const fR = n => { const v = round2(n); return (v >= 0 ? '+' : '') + v.toFixed(2)
 const gradeBucket = g => { g = String(g || '?'); return 'ABCD'.includes(g[0]) ? g[0] : '?'; };
 
 function analyse(rows) {
+  const num = v => (v == null || String(v).trim() === '') ? null : Number(v);   // blank = missing, not 0
   rows = rows.filter(r => r.date && r.result && !isNaN(parseFloat(r.r)))
              .map(r => ({ ...r, r: parseFloat(r.r), ru: Math.round(parseFloat(r.r) * 10000),
-                           violations: parseInt(r.violations) || 0 }))
-             .sort((a, b) => String(a.date).localeCompare(String(b.date)));
+                           violations: parseInt(r.violations) || 0,
+                           exec_grade: String(r.exec_grade || '').trim(),
+                           mins_in_trade: num(r.mins_in_trade), mins_in_drawdown: num(r.mins_in_drawdown) }))
+             // date, then trade number: the order the README defines, not the order of the text
+             .sort((a, b) => String(a.date).localeCompare(String(b.date)) || Number(a.trade_no) - Number(b.trade_no));
   if (!rows.length) { alert('No valid rows in the embedded data - rerun update_data.py.'); return; }
 
   const wins = rows.filter(r => r.result === 'Win'),
@@ -465,6 +479,30 @@ function analyse(rows) {
       scales: { y: { ticks: { callback: v => v + '%' }, suggestedMax: 60 },
                 x: { grid: { display: false } } } }
   });
+
+  /* time in trade and in drawdown: winners vs losers, break-even excluded, blanks skipped */
+  const hm = m => { const t = Math.round(m); return Math.floor(t / 60) + 'h ' + (t % 60) + 'm'; };
+  const avgMins = (a, k) => {
+    const v = a.map(r => r[k]).filter(x => x !== null);
+    return v.length ? hm(v.reduce((s, x) => s + x, 0) / v.length) + ` <span class="n">(${v.length})</span>` : 'n/a';
+  };
+  document.getElementById('timetable').innerHTML =
+    '<tr><th class="l"></th><th>Winners</th><th>Losers</th></tr>' +
+    [['Avg time in trade', 'mins_in_trade'], ['Avg time in drawdown', 'mins_in_drawdown']].map(([label, k]) =>
+      `<tr><td class="l">${label}</td><td>${avgMins(wins, k)}</td><td>${avgMins(losses, k)}</td></tr>`).join('');
+
+  /* execution grade: only trades that have one, grouped by letter */
+  const graded = rows.filter(r => r.exec_grade), eg = {};
+  graded.forEach(r => { const k = gradeBucket(r.exec_grade); (eg[k] = eg[k] || []).push(r); });
+  document.getElementById('execsub').textContent = 'win rate (excl. break-even) and average R · ' +
+    graded.length + ' graded trade' + (graded.length === 1 ? '' : 's');
+  document.getElementById('exectable').innerHTML =
+    '<tr><th class="l">Grade</th><th>Trades</th><th>Win rate</th><th>Avg R</th></tr>' +
+    (graded.length ? Object.keys(eg).sort().map(k => {
+      const g = eg[k], w = g.filter(r => r.result === 'Win').length, l = g.filter(r => r.result === 'Loss').length;
+      return `<tr><td class="l">${k}</td><td>${g.length}</td>
+        <td>${w + l ? (100 * w / (w + l)).toFixed(1) + '%' : 'n/a'}</td><td>${fR(exp(g))}</td></tr>`;
+    }).join('') : '<tr><td class="l" colspan="4">no graded trades yet</td></tr>');
 
   /* table */
   document.getElementById('logtable').innerHTML =
