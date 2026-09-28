@@ -15,6 +15,21 @@
 --   .headers on
 -- ============================================================
 
+-- Shared equity curve: one row per trade in sequence (date, then trade_no).
+-- The peak starts at 0R, so early losses count as drawdown (as in dashboard.html).
+DROP VIEW IF EXISTS equity_curve;
+CREATE VIEW equity_curve AS
+WITH running AS (
+    SELECT date, trade_no, r, SUM(r) OVER (ORDER BY date, trade_no) AS cum_r
+    FROM trades
+),
+peaks AS (
+    SELECT *, MAX(0, MAX(cum_r) OVER (ORDER BY date, trade_no)) AS peak_r
+    FROM running
+)
+SELECT date, trade_no, r, cum_r, peak_r, cum_r - peak_r AS drawdown_r
+FROM peaks;
+
 -- 1. Headline statistics
 SELECT
     COUNT(*)                                              AS total_trades,
@@ -77,24 +92,12 @@ FROM trades
 GROUP BY type
 ORDER BY net_r DESC;
 
--- 7. Equity curve and drawdown in R (window functions)
-WITH equity AS (
-    SELECT date, r, SUM(r) OVER (ORDER BY date, trade_no) AS cum_r FROM trades
-),
-peaks AS (
-    SELECT date, cum_r, MAX(cum_r) OVER (ORDER BY date) AS peak FROM equity
-)
-SELECT date, ROUND(cum_r, 2) AS equity_r, ROUND(cum_r - peak, 2) AS drawdown_r
-FROM peaks ORDER BY date;
+-- 7. Equity curve and drawdown in R
+SELECT date, trade_no, ROUND(cum_r, 2) AS equity_r, ROUND(drawdown_r, 2) AS drawdown_r
+FROM equity_curve ORDER BY date, trade_no;
 
 -- 8. Maximum drawdown suffered (R)
-WITH equity AS (
-    SELECT date, trade_no, SUM(r) OVER (ORDER BY date, trade_no) AS cum_r FROM trades
-),
-peaks AS (
-    SELECT cum_r, MAX(cum_r) OVER (ORDER BY date, trade_no) AS peak FROM equity
-)
-SELECT ROUND(MIN(cum_r - peak), 2) AS max_drawdown_r FROM peaks;
+SELECT ROUND(MIN(drawdown_r), 2) AS max_drawdown_r FROM equity_curve;
 
 -- 9. Longest losing streak (gaps-and-islands)
 WITH flagged AS (
