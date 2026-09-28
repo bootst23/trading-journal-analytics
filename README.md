@@ -40,6 +40,24 @@ Extraction also caught a mistyped date in the workbook (a trade entered as May
 that belonged to April). Before the fix it inflated the losing-streak stat from 7
 to 8 and put one trade in the wrong month.
 
+## Definitions
+
+Trades are taken in order of date, then trade number within the day. R is a
+trade's result as a multiple of the amount risked.
+
+- **Net R**: the sum of R over all trades.
+- **Win rate (excl. break-even)**: wins / (wins + losses) x 100. Break-even trades
+  are left out of both counts.
+- **Expectancy**: net R / number of trades, break-even trades included.
+- **Payoff ratio**: average R of winning trades / absolute average R of losing
+  trades.
+- **Max drawdown**: keep a running total of R, starting from a balance of 0R. The
+  peak is the highest running total so far, also starting at 0R, so losses on the
+  very first trades count. Drawdown is running total minus peak; max drawdown is
+  its lowest value.
+- **Longest losing streak**: the most losses in a row. A win or a break-even ends
+  a streak.
+
 ## Files
 
 | File | What it does |
