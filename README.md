@@ -57,6 +57,8 @@ trade's result as a multiple of the amount risked.
   its lowest value.
 - **Longest losing streak**: the most losses in a row. A win or a break-even ends
   a streak.
+- **Rounding**: figures are rounded half away from zero, so -6.665 shows as -6.67,
+  the same in Python, SQL and the dashboard.
 
 ## Files
 

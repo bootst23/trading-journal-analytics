@@ -283,23 +283,29 @@ Chart.defaults.color = C.muted;
 Chart.defaults.borderColor = C.grid;
 Chart.defaults.plugins.legend.display = false;
 
-const fR = n => (n >= 0 ? '+' : '') + n.toFixed(2) + 'R';
+// Round half away from zero on the decimal value, not its binary noise (-6.665 -> -6.67), as Python and SQL do.
+const round2 = n => Math.sign(n) * Math.round(Math.abs(n).toFixed(10) + 'e2') / 100;
+const fR = n => { const v = round2(n); return (v >= 0 ? '+' : '') + v.toFixed(2) + 'R'; };
 const gradeBucket = g => { g = String(g || '?'); return 'ABCD'.includes(g[0]) ? g[0] : '?'; };
 
 function analyse(rows) {
   rows = rows.filter(r => r.date && r.result && !isNaN(parseFloat(r.r)))
-             .map(r => ({ ...r, r: parseFloat(r.r), violations: parseInt(r.violations) || 0 }))
+             .map(r => ({ ...r, r: parseFloat(r.r), ru: Math.round(parseFloat(r.r) * 10000),
+                           violations: parseInt(r.violations) || 0 }))
              .sort((a, b) => String(a.date).localeCompare(String(b.date)));
   if (!rows.length) { alert('No valid rows in the embedded data - rerun update_data.py.'); return; }
 
   const wins = rows.filter(r => r.result === 'Win'),
         losses = rows.filter(r => r.result === 'Loss');
-  const netR = rows.reduce((s, r) => s + r.r, 0);
+  // Totals add R as whole ten-thousandths (ru) and divide once: float sums drift off exact halves.
+  const sumR = a => a.reduce((s, r) => s + r.ru, 0) / 10000;
+  const netR = sumR(rows);
   let cum = 0, peak = 0, maxDD = 0;
-  const eq = rows.map(r => { cum += r.r; peak = Math.max(peak, cum);
-    maxDD = Math.min(maxDD, cum - peak); return { d: r.date, v: cum, dd: cum - peak }; });
+  const eq = rows.map(r => { cum += r.ru; peak = Math.max(peak, cum); maxDD = Math.min(maxDD, cum - peak);
+    return { d: r.date, v: cum / 10000, dd: (cum - peak) / 10000 }; });
+  maxDD /= 10000;
   const clean = rows.filter(r => r.violations === 0), vio = rows.filter(r => r.violations > 0);
-  const exp = a => a.length ? a.reduce((s, r) => s + r.r, 0) / a.length : 0;
+  const exp = a => a.length ? sumR(a) / a.length : 0;
 
   let streak = 0, worst = 0;
   rows.forEach(r => { streak = r.result === 'Loss' ? streak + 1 : 0; worst = Math.max(worst, streak); });
@@ -319,7 +325,7 @@ function analyse(rows) {
   document.getElementById('stat-streak').textContent = 'longest losing streak · ' + worst;
   const netEl = document.getElementById('stat-net');
   netEl.textContent = fR(netR); netEl.className = 'num ' + (netR >= 0 ? 'pos' : 'neg');
-  document.getElementById('stat-clean').textContent = 'rule-compliant only · ' + fR(clean.reduce((s,r)=>s+r.r,0));
+  document.getElementById('stat-clean').textContent = 'rule-compliant only · ' + fR(sumR(clean));
 
   const kpis = [
     ['Win rate (excl BE)', (100 * wins.length / (wins.length + losses.length)).toFixed(1) + '%', ''],
@@ -335,11 +341,11 @@ function analyse(rows) {
 
   /* hero monthly mini */
   const mo = {};
-  rows.forEach(r => { const m = String(r.date).slice(0, 7); mo[m] = (mo[m] || 0) + r.r; });
+  rows.forEach(r => { const m = String(r.date).slice(0, 7); mo[m] = (mo[m] || 0) + r.ru; });
   const moKeys = Object.keys(mo).sort();
   new Chart(document.getElementById('heromonthly'), {
     type: 'bar',
-    data: { labels: moKeys.map(m => m.slice(5)), datasets: [{ data: moKeys.map(m => mo[m]),
+    data: { labels: moKeys.map(m => m.slice(5)), datasets: [{ data: moKeys.map(m => mo[m] / 10000),
       backgroundColor: moKeys.map(m => mo[m] >= 0 ? C.ink : 'rgba(24,24,27,.25)'),
       borderRadius: 6, maxBarThickness: 26 }] },
     options: { maintainAspectRatio: false,
@@ -429,7 +435,7 @@ function analyse(rows) {
   const ty = {};
   rows.forEach(r => { const k = r.type || 'Unlabelled'; (ty[k] = ty[k] || []).push(r); });
   const tKeys = Object.keys(ty).sort((a, b) => exp(ty[b]) - exp(ty[a]));
-  const tNet = k => ty[k].reduce((s, r) => s + r.r, 0);
+  const tNet = k => sumR(ty[k]);
   const tWr = k => {
     const w = ty[k].filter(r => r.result === 'Win').length,
           l = ty[k].filter(r => r.result === 'Loss').length;

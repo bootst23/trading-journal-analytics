@@ -320,3 +320,9 @@ def test_net_r_rounds_half_up_deterministically():
         {'r': -3.3325, 'result': 'Loss', 'date': '2026-01-02'},
     ]
     assert summarise(trades)['net_r'] == -6.67
+
+
+def test_win_rate_rounds_half_up_like_sql_and_the_dashboard():
+    """21 wins in 80 decided trades is 26.25%: half-up gives 26.3, round() would give 26.2."""
+    trades = [{'r': 1, 'result': 'Win'}] * 21 + [{'r': -1, 'result': 'Loss'}] * 59
+    assert summarise(trades)['win_rate'] == 26.3

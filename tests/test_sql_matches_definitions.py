@@ -4,12 +4,14 @@ Each test runs one query from analysis.sql against a database built from the
 committed journal.csv, and recomputes the same figure in plain Python straight
 from the CSV. Nothing is hard-coded, so the tests keep passing as trades are added.
 One small synthetic journal covers cases the real one cannot (an opening loss).
-SQL rounds its output, so each comparison allows half of the last rounded digit.
+Python works in Decimal from the CSV text and rounds half away from zero to the
+same places as the SQL, so every comparison is exact.
 """
 import csv
 import re
 import sqlite3
 import sys
+from decimal import Decimal, ROUND_HALF_UP
 from pathlib import Path
 
 import pytest
@@ -20,9 +22,9 @@ sys.path.insert(0, str(REPO_ROOT))
 from update_data import load_database, write_csv  # noqa: E402
 
 
-def rounded(value, places):
-    """Match a Python value against SQL's ROUND(x, places) output."""
-    return pytest.approx(value, abs=0.5 * 10 ** -places + 1e-9)
+def half_up(value, places):
+    """Round a Decimal half away from zero, as SQLite's ROUND(x, places) does."""
+    return float(value.quantize(Decimal(1).scaleb(-places), rounding=ROUND_HALF_UP))
 
 
 # analysis.sql split once at its '-- N. ' headings. The text before query 1 is
@@ -57,7 +59,7 @@ def db(tmp_path_factory):
 def trades():
     rows = list(csv.DictReader(open(REPO_ROOT / 'journal.csv', newline='')))
     for t in rows:
-        t['r'] = float(t['r'])
+        t['r'] = Decimal(t['r'])             # exact, straight from the CSV text
         t['violations'] = int(t['violations'])
     return sorted(rows, key=lambda t: (t['date'], int(t['trade_no'])))
 
@@ -70,9 +72,9 @@ def test_headline_query_matches_definitions(db, trades):
 
     assert (total, wins, losses, be) == (
         len(trades), n_win, n_loss, sum(t['result'] == 'BE' for t in trades))
-    assert win_rate == rounded(100 * n_win / (n_win + n_loss), 1)
-    assert net_r == rounded(net, 2)
-    assert expectancy == rounded(net / len(trades), 3)
+    assert win_rate == half_up(Decimal(100 * n_win) / (n_win + n_loss), 1)
+    assert net_r == half_up(net, 2)
+    assert expectancy == half_up(net / len(trades), 3)
 
 
 def test_compliance_query_matches_definitions(db, trades):
@@ -85,34 +87,33 @@ def test_compliance_query_matches_definitions(db, trades):
         n, net_r, exp = rows[label]
         net = sum(t['r'] for t in group)
         assert n == len(group)
-        assert net_r == rounded(net, 2)
-        assert exp == rounded(net / len(group), 3)
+        assert net_r == half_up(net, 2)
+        assert exp == half_up(net / len(group), 3)
 
 
 def test_max_drawdown_query_matches_definition(db, trades):
-    cum = peak = worst = 0.0                 # balance and peak both start at 0R
+    cum = peak = worst = Decimal(0)          # balance and peak both start at 0R
     for t in trades:
         cum += t['r']
         peak = max(peak, cum)
         worst = min(worst, cum - peak)
 
-    assert db.execute(sql_query(8)).fetchone()[0] == rounded(worst, 2)
+    assert db.execute(sql_query(8)).fetchone()[0] == half_up(worst, 2)
 
 
 def test_equity_curve_view_matches_python_row_by_row(db, trades):
-    cum = peak = 0.0                         # balance and peak both start at 0R
+    cum = peak = Decimal(0)                  # balance and peak both start at 0R
     expected = []
     for t in trades:
         cum += t['r']
         peak = max(peak, cum)
-        expected.append((t['date'], int(t['trade_no']), cum, peak, cum - peak))
-    got = db.execute("SELECT date, trade_no, cum_r, peak_r, drawdown_r "
-                     "FROM equity_curve ORDER BY date, trade_no").fetchall()
+        expected.append((t['date'], int(t['trade_no']),
+                         half_up(cum, 4), half_up(peak, 4), half_up(cum - peak, 4)))
+    # R has at most 4 decimals, so 4 places is exact; it only strips float-sum noise
+    got = db.execute("SELECT date, trade_no, ROUND(cum_r, 4), ROUND(peak_r, 4), "
+                     "ROUND(drawdown_r, 4) FROM equity_curve ORDER BY date, trade_no").fetchall()
 
-    assert len(got) == len(expected)
-    for g, e in zip(got, expected):
-        assert g[:2] == e[:2]
-        assert g[2:] == pytest.approx(e[2:]), f'{e[0]} trade #{e[1]}'
+    assert got == expected
 
 
 def test_max_drawdown_counts_early_and_same_day_losses(tmp_path):

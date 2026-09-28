@@ -98,7 +98,8 @@ def summarise(trades):
     return {
         'trades': len(trades),
         'net_r': float(net.quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)),
-        'win_rate': round(100 * wins / decided, 1) if decided else 0.0,
+        'win_rate': float((Decimal(100 * wins) / decided).quantize(
+            Decimal('0.1'), rounding=ROUND_HALF_UP)) if decided else 0.0,
         'first_date': trades[0].get('date') if trades else None,
         'last_date': trades[-1].get('date') if trades else None,
     }
