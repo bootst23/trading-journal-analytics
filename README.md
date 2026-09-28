@@ -46,7 +46,7 @@ to 8 and put one trade in the wrong month.
 |---|---|
 | `journal.csv` | Per-trade extract from the workbook |
 | `analysis.sql` | 10 SQLite queries: headline stats, payoff, compliance split, grade expectancy, monthly breakdowns, equity/drawdown (window functions), losing streaks |
-| `update_data.py` | Reads the workbook's Master sheet, validates dates, rewrites the CSV and the dashboard's embedded data |
+| `update_data.py` | Reads the workbook's Master sheet, validates dates, rewrites the CSV and the dashboard's embedded data; `--db-only` builds `journal.db` from the CSV |
 | `dashboard.html` | Single-file dashboard (Chart.js + SheetJS); opens with the data embedded, can load the original .xlsx or a CSV |
 
 ## Run it
@@ -55,9 +55,16 @@ Open `dashboard.html` in a browser. To load fresh data, click *Load journal* - i
 takes the original `.xlsx` workbook or a CSV with columns:
 `date, direction, result (Win/Loss/BE), r, violations, type, grade`.
 
-For the SQL, see the setup block at the top of `analysis.sql` - create the typed
-table first, since importing into a new table makes every column TEXT and breaks
-numeric comparisons.
+For the SQL, build `journal.db` from the committed `journal.csv` (no workbook
+needed), then run the queries. Both lines work in PowerShell, cmd and bash:
+
+```
+python update_data.py --db-only
+sqlite3 -header -column journal.db ".read analysis.sql"
+```
+
+Use `pip install -r requirements.txt` first. `sqlite3` is the SQLite command-line
+tool (sqlite.org/download.html).
 
 ---
 *Nathan Yap Hao Kang · nathan7657@gmail.com*

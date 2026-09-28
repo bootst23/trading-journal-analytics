@@ -2,17 +2,10 @@
 -- Trading Journal Analysis (SQLite) - R-multiple based
 -- Author: Nathan Yap Hao Kang
 --
--- Setup (typed table first - a raw .import makes every column
--- TEXT and silently breaks numeric comparisons):
+-- Setup (the typed table is defined once, in update_data.py's SCHEMA):
 --
---   sqlite3 journal.db
---   CREATE TABLE trades (
---       date TEXT, month TEXT, direction TEXT, trade_no INTEGER,
---       result TEXT, r REAL, v1 TEXT, v2 TEXT, v3 TEXT, v4 TEXT,
---       violations INTEGER, type TEXT, grade TEXT, mins_in_trade REAL);
---   .import --csv --skip 1 nathan_journal.csv trades
---   .mode column
---   .headers on
+--   python update_data.py --db-only
+--   sqlite3 -header -column journal.db ".read analysis.sql"
 -- ============================================================
 
 -- Shared equity curve: one row per trade in sequence (date, then trade_no).

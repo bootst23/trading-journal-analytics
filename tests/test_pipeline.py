@@ -4,12 +4,14 @@ Design notes:
   * The real trading workbook is never used here. Every test that needs a
     workbook builds a small synthetic one in a temp directory, so the suite
     runs anywhere (including CI) and no personal trade data lives in the repo.
-  * The one exception is the final test, which reads the committed journal.csv
-    to guard the published headline figures against regressions.
+  * The exceptions read the committed journal.csv: the --db-only test, and the
+    final test, which guards the published headline figures against regressions.
 """
 import csv
 import datetime
+import shutil
 import sqlite3
+import subprocess
 import sys
 from pathlib import Path
 
@@ -220,7 +222,7 @@ def test_extract_raises_naming_missing_required_headers(tmp_path):
 
 
 # ==========================================================================
-# load_database - 4 tests
+# load_database - 5 tests
 # ==========================================================================
 
 @pytest.fixture
@@ -264,6 +266,20 @@ def test_load_database_is_rerunnable_without_duplicating_rows(loaded_db):
     db_path, _, trades = loaded_db
     csv_path = db_path.parent / 'journal.csv'
     assert load_database(csv_path, db_path) == len(trades)
+
+
+def test_db_only_builds_the_database_from_journal_csv_alone(tmp_path):
+    """A fresh clone has journal.csv but no workbook and must still get journal.db."""
+    shutil.copy(REPO_ROOT / 'update_data.py', tmp_path)
+    shutil.copy(REPO_ROOT / 'journal.csv', tmp_path)       # no workbook, no dashboard
+    n = len(list(csv.DictReader(open(REPO_ROOT / 'journal.csv', newline=''))))
+    out = subprocess.run([sys.executable, 'update_data.py', '--db-only'], cwd=tmp_path,
+                         capture_output=True, text=True, check=True).stdout
+    assert f'Loaded {n} trades into journal.db' in out
+    con = sqlite3.connect(tmp_path / 'journal.db')
+    assert con.execute("SELECT COUNT(*) FROM trades").fetchone()[0] == n
+    assert con.execute("SELECT typeof(r) FROM trades LIMIT 1").fetchone()[0] == 'real'
+    con.close()
 
 
 # ==========================================================================

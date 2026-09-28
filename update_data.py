@@ -5,6 +5,7 @@ update_data.py - refresh the trading dashboard from the journal workbook.
 Usage:
     python update_data.py Trading_Months_Stats.xlsx
     python update_data.py Trading_Months_Stats.xlsx --db      # also build journal.db
+    python update_data.py --db-only      # build journal.db from the committed journal.csv
 
 What it does:
     1. Reads the 'Master' sheet from the workbook
@@ -186,9 +187,16 @@ def main(argv=None):
     argv = sys.argv[1:] if argv is None else argv
     if not argv:
         sys.exit(__doc__)
+    here = Path(__file__).parent
+    if argv[0] == '--db-only':
+        csv_path = here / 'journal.csv'
+        if not csv_path.exists():
+            sys.exit("journal.csv not found next to this script")
+        n = load_database(csv_path, here / 'journal.db')
+        print(f"Loaded {n} trades into journal.db")
+        return
     xlsx = Path(argv[0])
     want_db = '--db' in argv[1:]
-    here = Path(__file__).parent
     dash = here / 'dashboard.html'
     if not xlsx.exists():
         sys.exit(f"Workbook not found: {xlsx}")
