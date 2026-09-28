@@ -133,3 +133,14 @@ def test_losing_streak_query_matches_definition(db, trades):
         longest = max(longest, streak)
 
     assert db.execute(sql_query(9)).fetchone()[0] == longest
+
+
+@pytest.mark.parametrize('number', [5, 10])
+def test_monthly_queries_group_by_the_month_of_the_date(db, trades, number):
+    """One row per calendar month taken from the date, in order, with its trade count."""
+    expected = {}
+    for t in trades:
+        expected[t['date'][:7]] = expected.get(t['date'][:7], 0) + 1
+
+    got = [(month, n) for month, n, *_ in db.execute(sql_query(number))]
+    assert got == sorted(expected.items())

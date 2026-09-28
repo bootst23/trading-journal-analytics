@@ -33,11 +33,11 @@ MONTHS = {'january':1,'february':2,'march':3,'april':4,'may':5,'june':6,
 
 # The CSV column order. The SQLite schema below must stay in the same order,
 # because sqlite's .import (and our INSERT) are positional.
-FIELDNAMES = ['date', 'month', 'direction', 'trade_no', 'result', 'r',
+FIELDNAMES = ['date', 'direction', 'trade_no', 'result', 'r',
               'v1', 'v2', 'v3', 'v4', 'violations', 'type', 'grade', 'mins_in_trade']
 
 SCHEMA = """CREATE TABLE trades (
-    date TEXT, month TEXT, direction TEXT, trade_no INTEGER,
+    date TEXT, direction TEXT, trade_no INTEGER,
     result TEXT, r REAL, v1 TEXT, v2 TEXT, v3 TEXT, v4 TEXT,
     violations INTEGER, type TEXT, grade TEXT, mins_in_trade REAL)"""
 
@@ -138,7 +138,7 @@ def extract(xlsx_path):
             warnings.append(f"  ! {date.date()} trade #{no}: dated {date.strftime('%B')} "
                             f"but labelled '{month}' ({tag})")
         trades.append({
-            'date': date.strftime('%Y-%m-%d'), 'month': month, 'direction': direction,
+            'date': date.strftime('%Y-%m-%d'), 'direction': direction,
             'trade_no': no, 'result': result, 'r': r,
             'v1': bool(v1), 'v2': bool(v2), 'v3': bool(v3), 'v4': bool(v4),
             'violations': sum(bool(row[i]) for i in v_idx),
@@ -150,7 +150,7 @@ def extract(xlsx_path):
 
 
 def write_csv(trades, csv_path):
-    """Write the full 14-column extract."""
+    """Write the full 13-column extract."""
     with open(csv_path, 'w', newline='') as f:
         w = csv.DictWriter(f, fieldnames=FIELDNAMES)
         w.writeheader()

@@ -64,7 +64,7 @@ trade's result as a multiple of the amount risked.
 |---|---|
 | `journal.csv` | Per-trade extract from the workbook |
 | `analysis.sql` | 10 SQLite queries: headline stats, payoff, compliance split, grade expectancy, monthly breakdowns, equity/drawdown (window functions), losing streaks |
-| `update_data.py` | Reads the workbook's Master sheet, validates dates, rewrites the CSV and the dashboard's embedded data; `--db-only` builds `journal.db` from the CSV |
+| `update_data.py` | Reads the workbook's Master sheet by header name, warns when a trade's typed Month label disagrees with its date (the date is the source of truth; the label is not exported), rewrites the CSV and the dashboard's embedded data; `--db-only` builds `journal.db` from the CSV |
 | `dashboard.html` | Single-file dashboard (Chart.js + SheetJS); opens with the data embedded, can load the original .xlsx or a CSV |
 
 ## Run it

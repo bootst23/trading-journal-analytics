@@ -179,6 +179,7 @@ def test_extract_flags_a_month_label_that_disagrees_with_the_date(tmp_path):
     assert len(trades) == 1            # flagged, not dropped
     assert len(warnings) == 1
     assert 'possible typo' in warnings[0]
+    assert 'month' not in trades[0]    # the date is the source of truth
 
 
 def test_extract_sorts_by_date_then_trade_number(tmp_path):
@@ -229,10 +230,10 @@ def test_extract_raises_naming_missing_required_headers(tmp_path):
 @pytest.fixture
 def loaded_db(tmp_path):
     trades = [
-        {'date': '2026-02-05', 'month': 'February', 'direction': 'Short', 'trade_no': 1,
+        {'date': '2026-02-05', 'direction': 'Short', 'trade_no': 1,
          'result': 'Win', 'r': 1.72, 'v1': False, 'v2': False, 'v3': False, 'v4': False,
          'violations': 0, 'type': 'Breakout', 'grade': 'B+', 'mins_in_trade': ''},
-        {'date': '2026-02-06', 'month': 'February', 'direction': 'Long', 'trade_no': 2,
+        {'date': '2026-02-06', 'direction': 'Long', 'trade_no': 2,
          'result': 'Loss', 'r': -1.0, 'v1': True, 'v2': False, 'v3': False, 'v4': False,
          'violations': 1, 'type': 'Range-Bound', 'grade': 'C', 'mins_in_trade': ''},
     ]

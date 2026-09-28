@@ -67,13 +67,13 @@ ORDER BY grade_bucket;
 
 -- 5. Grade discipline over time: share of trades that were A-grade, by month
 SELECT
-    strftime('%Y-%m', date)                             AS month,
+    strftime('%Y-%m', date)                             AS trade_month,
     COUNT(*)                                            AS trades,
     ROUND(100.0 * SUM(SUBSTR(grade,1,1) = 'A') / COUNT(*), 1) AS pct_a_grade,
     ROUND(SUM(r), 2)                                    AS net_r
 FROM trades
-GROUP BY month
-ORDER BY month;
+GROUP BY trade_month
+ORDER BY trade_month;
 
 -- 6. Performance by trade type
 SELECT
@@ -106,10 +106,10 @@ FROM (SELECT COUNT(*) AS streak FROM flagged WHERE is_loss = 1 GROUP BY grp);
 
 -- 10. Violation rate by month: did discipline improve?
 SELECT
-    strftime('%Y-%m', date)                                   AS month,
+    strftime('%Y-%m', date)                                   AS trade_month,
     COUNT(*)                                                  AS trades,
     ROUND(100.0 * SUM(violations > 0) / COUNT(*), 1)          AS violation_rate_pct,
     ROUND(SUM(r), 2)                                          AS net_r
 FROM trades
-GROUP BY month
-ORDER BY month;
+GROUP BY trade_month
+ORDER BY trade_month;
