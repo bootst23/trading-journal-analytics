@@ -45,6 +45,12 @@ EMBED_COLUMNS = ['date', 'direction', 'result', 'r', 'violations', 'type', 'grad
 
 EMBED_PATTERN = r'const MY_JOURNAL = `[^`]*`;'
 
+# Master sheet headers extract() needs, matched by text (trimmed), not position.
+# V1-V4 are required because journal.csv writes them; V5-V8 are counted if present.
+REQUIRED_HEADERS = ['Month', 'Direction', 'Date', 'Trade No.', 'Result', 'R',
+                    'V1', 'V2', 'V3', 'V4', 'Type', 'Setup Grade']
+V_HEADERS = [f'V{i}' for i in range(1, 9)]
+
 
 class PipelineError(Exception):
     """Raised when the pipeline cannot safely continue.
@@ -107,10 +113,18 @@ def extract(xlsx_path):
     if 'Master' not in wb.sheetnames:
         raise PipelineError("No 'Master' sheet found in the workbook.")
     ws = wb['Master']
+    header = next(ws.iter_rows(max_row=1, values_only=True), ())
+    col = {str(h).strip(): i for i, h in enumerate(header) if h is not None}
+    missing = [h for h in REQUIRED_HEADERS if h not in col]
+    if missing:
+        raise PipelineError(f"Master sheet is missing required header(s): {', '.join(missing)}")
+    v_idx = [col[h] for h in V_HEADERS if h in col]
     trades, warnings = [], []
 
-    for row in ws.iter_rows(min_row=2, max_col=16, values_only=True):
-        month, direction, date, no, result, r, v1, v2, v3, v4, v5, ttype, grade, *_ = row
+    for row in ws.iter_rows(min_row=2, values_only=True):
+        month, direction, date, no, result, r = (row[col[h]] for h in REQUIRED_HEADERS[:6])
+        v1, v2, v3, v4 = (row[col[h]] for h in V_HEADERS[:4])
+        ttype, grade = row[col['Type']], row[col['Setup Grade']]
         if not isinstance(date, datetime.datetime) or result not in ('Win', 'Loss', 'BE'):
             continue
         if not isinstance(r, (int, float)):
@@ -126,7 +140,7 @@ def extract(xlsx_path):
             'date': date.strftime('%Y-%m-%d'), 'month': month, 'direction': direction,
             'trade_no': no, 'result': result, 'r': r,
             'v1': bool(v1), 'v2': bool(v2), 'v3': bool(v3), 'v4': bool(v4),
-            'violations': sum(bool(x) for x in (v1, v2, v3, v4, v5)),
+            'violations': sum(bool(row[i]) for i in v_idx),
             'type': ttype, 'grade': grade, 'mins_in_trade': '',
         })
 

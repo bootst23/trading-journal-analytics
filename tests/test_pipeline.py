@@ -30,16 +30,18 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 # helpers
 # --------------------------------------------------------------------------
 
-HEADER = ['Month', 'Direction', 'Date', 'No', 'Result', 'R',
-          'V1', 'V2', 'V3', 'V4', 'V5', 'Type', 'Grade']
+# Mirrors the real Master sheet, including the trailing space on 'Trade No. '.
+HEADER = ['Month', 'Direction', 'Date', 'Trade No. ', 'Result', 'R',
+          'V1', 'V2', 'V3', 'V4', 'V5', 'V6', 'V7', 'V8', 'Type', 'Setup Grade',
+          'Execution Grade', 'D. in trade', 'D. in drawdown', 'D. helper']
 
 
-def make_workbook(path, rows, sheet_name='Master'):
+def make_workbook(path, rows, sheet_name='Master', header=HEADER):
     """Build a minimal .xlsx that mimics the real Master sheet layout."""
     wb = openpyxl.Workbook()
     ws = wb.active
     ws.title = sheet_name
-    ws.append(HEADER)
+    ws.append(header)
     for r in rows:
         ws.append(r)
     wb.save(path)
@@ -47,9 +49,10 @@ def make_workbook(path, rows, sheet_name='Master'):
 
 
 def trade_row(month='February', direction='Long', date=None, no=1, result='Win',
-              r=2.0, flags=(None,) * 5, ttype='Breakout', grade='B+'):
+              r=2.0, flags=(None,) * 8, ttype='Breakout', grade='B+'):
     date = date or datetime.datetime(2026, 2, 5)
-    return [month, direction, date, no, result, r, *flags, ttype, grade]
+    return [month, direction, date, no, result, r, *flags, ttype, grade,
+            'Exec-A', None, None, None]
 
 
 @pytest.fixture
@@ -129,7 +132,7 @@ def test_replace_embed_rejects_a_backtick_in_the_data():
 
 
 # ==========================================================================
-# extract - 6 tests
+# extract - 8 tests
 # ==========================================================================
 
 def test_extract_reads_valid_rows(tmp_path):
@@ -138,14 +141,16 @@ def test_extract_reads_valid_rows(tmp_path):
     assert len(trades) == 1
     assert trades[0]['date'] == '2026-02-05'
     assert trades[0]['result'] == 'Win'
+    assert trades[0]['type'] == 'Breakout'
+    assert trades[0]['grade'] == 'B+'
     assert warnings == []
 
 
 def test_extract_skips_non_trade_rows_silently(tmp_path):
     rows = [
         trade_row(),
-        ['February', 'Long', 'not a date', 2, 'Win', 1.0, *[None] * 5, 'Breakout', 'B'],
-        ['', '', None, None, None, None, *[None] * 5, '', ''],          # blank row
+        ['February', 'Long', 'not a date', 2, 'Win', 1.0, *[None] * 8, 'Breakout', 'B'],
+        ['', '', None, None, None, None, *[None] * 8, '', ''],          # blank row
         trade_row(date=datetime.datetime(2026, 2, 7), no=3, result='Summary'),
     ]
     book = make_workbook(tmp_path / 'b.xlsx', rows)
@@ -186,11 +191,32 @@ def test_extract_sorts_by_date_then_trade_number(tmp_path):
         ('2026-02-10', 7), ('2026-02-12', 8), ('2026-02-12', 9)]
 
 
-def test_extract_counts_violations_across_all_five_flags(tmp_path):
-    rows = [trade_row(flags=('x', None, 'x', None, 'x'))]
+def test_extract_counts_violations_across_all_eight_flags(tmp_path):
+    rows = [trade_row(flags=('x', None, 'x', None, 'x', None, 'x', 'x'))]
     book = make_workbook(tmp_path / 'b.xlsx', rows)
     trades, _ = extract(book)
-    assert trades[0]['violations'] == 3
+    assert trades[0]['violations'] == 5
+
+
+def test_extract_reads_columns_by_header_in_any_order(tmp_path):
+    order = [15, 3, 19, 0, 7, 14, 2, 10, 5, 1, 17, 12, 4, 8, 16, 6, 11, 9, 18, 13]
+    row = trade_row(flags=('x', None, None, 'x', None, None, 'x', None))
+    book = make_workbook(tmp_path / 'b.xlsx', [[row[i] for i in order]],
+                         header=[HEADER[i] for i in order])
+    trades, warnings = extract(book)
+    assert warnings == []
+    t = trades[0]
+    assert (t['date'], t['direction'], t['trade_no'], t['result'], t['r']) == (
+        '2026-02-05', 'Long', 1, 'Win', 2.0)
+    assert (t['v1'], t['v2'], t['v3'], t['v4']) == (True, False, False, True)
+    assert (t['violations'], t['type'], t['grade']) == (3, 'Breakout', 'B+')
+
+
+def test_extract_raises_naming_missing_required_headers(tmp_path):
+    header = [h for h in HEADER if h not in ('Setup Grade', 'Trade No. ')]
+    book = make_workbook(tmp_path / 'b.xlsx', [], header=header)
+    with pytest.raises(PipelineError, match=r'Trade No\., Setup Grade'):
+        extract(book)
 
 
 # ==========================================================================
