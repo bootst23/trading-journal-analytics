@@ -8,7 +8,6 @@
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <style>
   :root {
     --bg: #f6f5f1; --hero: #eceee3; --card: #ffffff;
@@ -29,8 +28,6 @@
     transition: margin-left .25s ease; }
   body.nav-hidden aside { margin-left: -232px; }
   .brand { font-weight: 700; font-size: 17px; letter-spacing: -.02em; padding: 2px 10px 20px; }
-  .navlabel { font-size: 11px; color: var(--muted); text-transform: uppercase;
-    letter-spacing: .06em; padding: 16px 10px 6px; }
   aside a { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 9px;
     color: var(--ink); text-decoration: none; font-weight: 500; font-size: 13.5px; }
   aside a:hover { background: #ecebe5; }
@@ -50,14 +47,6 @@
   .icon-btn:hover { background: #f1f0ea; }
   .icon-btn svg { width: 16px; height: 16px; stroke: var(--ink); fill: none; stroke-width: 2; }
   .topbar .range { color: var(--muted); font-size: 13px; }
-  .topbar .spacer { flex: 1; }
-  .btn-dark { background: var(--ink); color: #fff; border: none; border-radius: 11px;
-    padding: 10px 18px; font-weight: 600; font-size: 13.5px; cursor: pointer;
-    display: inline-flex; align-items: center; gap: 8px; box-shadow: var(--shadow); }
-  .btn-dark:hover { opacity: .88; }
-  .btn-dark svg { width: 15px; height: 15px; stroke: #fff; fill: none; stroke-width: 2.2; }
-  .fname { font-size: 12px; color: var(--muted); }
-  input[type=file] { position: absolute; width: 1px; height: 1px; opacity: 0; }
 
   /* ---------- hero band ---------- */
   .hero { background: var(--hero); border-radius: 18px; padding: 26px clamp(18px, 3vw, 34px);
@@ -125,9 +114,7 @@
   <a href="#equity"><svg viewBox="0 0 24 24"><path d="M3 17l6-6 4 4 7-8M21 7v5h-5"/></svg>Equity</a>
   <a href="#discipline"><svg viewBox="0 0 24 24"><path d="M12 3l7 4v5c0 5-3.5 8-7 9-3.5-1-7-4-7-9V7z"/></svg>Discipline</a>
   <a href="#log"><svg viewBox="0 0 24 24"><path d="M4 5h16M4 12h16M4 19h10"/></svg>Trade log</a>
-  <div class="navlabel">Data</div>
-  <a href="#" id="reload"><svg viewBox="0 0 24 24"><path d="M4 4v6h6M20 20v-6h-6M5.5 9A8 8 0 0119 7.5M18.5 15A8 8 0 015 16.5"/></svg>Reset to my journal</a>
-  <div class="foot">Nathan Yap · Feb-Jun 2026<br>81 trades · crypto derivatives</div>
+  <div class="foot" id="foot">Nathan Yap</div>
 </aside>
 
 <main id="top">
@@ -138,10 +125,6 @@
       <div style="font-weight:700; font-size:16px; letter-spacing:-.01em">Performance overview</div>
       <div class="range mono" id="range">-</div>
     </div>
-    <div class="spacer"></div>
-    <span class="fname" id="fname">my journal · embedded</span>
-    <label class="btn-dark"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
-      Load journal<input type="file" id="csv" accept=".csv,.xlsx,.xls"></label>
   </div>
 
   <section class="hero">
@@ -203,8 +186,7 @@
 
   <footer>
     Single-file dashboard · analytics reproduced in SQL (analysis.sql) ·
-    accepts the original journal workbook (Master sheet) or CSV with columns:
-    date, direction, result (Win/Loss/BE), r, violations, type, grade.
+    data embedded by update_data.py.
   </footer>
 </main>
 
@@ -301,7 +283,6 @@ Chart.defaults.color = C.muted;
 Chart.defaults.borderColor = C.grid;
 Chart.defaults.plugins.legend.display = false;
 
-let charts = [];
 const fR = n => (n >= 0 ? '+' : '') + n.toFixed(2) + 'R';
 const gradeBucket = g => { g = String(g || '?'); return 'ABCD'.includes(g[0]) ? g[0] : '?'; };
 
@@ -309,7 +290,7 @@ function analyse(rows) {
   rows = rows.filter(r => r.date && r.result && !isNaN(parseFloat(r.r)))
              .map(r => ({ ...r, r: parseFloat(r.r), violations: parseInt(r.violations) || 0 }))
              .sort((a, b) => String(a.date).localeCompare(String(b.date)));
-  if (!rows.length) { alert('No valid rows found - see footer for expected columns.'); return; }
+  if (!rows.length) { alert('No valid rows in the embedded data - rerun update_data.py.'); return; }
 
   const wins = rows.filter(r => r.result === 'Win'),
         losses = rows.filter(r => r.result === 'Loss');
@@ -325,6 +306,12 @@ function analyse(rows) {
 
   document.getElementById('range').textContent =
     rows[0].date + ' → ' + rows[rows.length - 1].date;
+  /* sidebar footer: month span and trade count come from the data, so they cannot go stale */
+  const MON = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  const [y0, m0] = rows[0].date.split('-'), [y1, m1] = rows[rows.length - 1].date.split('-');
+  const span = y0 === y1 ? `${MON[m0 - 1]}-${MON[m1 - 1]} ${y1}` : `${MON[m0 - 1]} ${y0}-${MON[m1 - 1]} ${y1}`;
+  document.getElementById('foot').innerHTML =
+    `Nathan Yap · ${span}<br>${rows.length} trades · crypto derivatives`;
 
   /* hero */
   document.getElementById('gaugepct').textContent = Math.round(100 * clean.length / rows.length) + '%';
@@ -346,13 +333,11 @@ function analyse(rows) {
   document.getElementById('kpis').innerHTML = kpis.map(([l, v, c]) =>
     `<div class="kpi"><div class="label">${l}</div><div class="value ${c}">${v}</div></div>`).join('');
 
-  charts.forEach(c => c.destroy()); charts = [];
-
   /* hero monthly mini */
   const mo = {};
   rows.forEach(r => { const m = String(r.date).slice(0, 7); mo[m] = (mo[m] || 0) + r.r; });
   const moKeys = Object.keys(mo).sort();
-  charts.push(new Chart(document.getElementById('heromonthly'), {
+  new Chart(document.getElementById('heromonthly'), {
     type: 'bar',
     data: { labels: moKeys.map(m => m.slice(5)), datasets: [{ data: moKeys.map(m => mo[m]),
       backgroundColor: moKeys.map(m => mo[m] >= 0 ? C.ink : 'rgba(24,24,27,.25)'),
@@ -361,20 +346,20 @@ function analyse(rows) {
       plugins: { tooltip: { callbacks: { label: c => fR(c.parsed.y) } } },
       scales: { y: { ticks: { callback: v => v + 'R' }, grid: { color: 'rgba(24,24,27,.06)' } },
                 x: { grid: { display: false } } } }
-  }));
+  });
 
   /* gauge */
   const pct = clean.length / rows.length;
-  charts.push(new Chart(document.getElementById('gauge'), {
+  new Chart(document.getElementById('gauge'), {
     type: 'doughnut',
     data: { datasets: [{ data: [pct, 1 - pct],
       backgroundColor: [C.ink, 'rgba(24,24,27,.12)'], borderWidth: 0 }] },
     options: { maintainAspectRatio: false, cutout: '78%', rotation: -110, circumference: 220,
       plugins: { tooltip: { enabled: false } } }
-  }));
+  });
 
   /* equity */
-  charts.push(new Chart(document.getElementById('equitychart'), {
+  new Chart(document.getElementById('equitychart'), {
     data: { labels: eq.map(e => e.d), datasets: [
       { type: 'line', data: eq.map(e => e.v), borderColor: C.equity, borderWidth: 2,
         pointRadius: 0, tension: .25, label: 'Equity (R)' },
@@ -384,12 +369,12 @@ function analyse(rows) {
       plugins: { tooltip: { callbacks: { label: c => c.dataset.label + ': ' + fR(c.parsed.y) } } },
       scales: { x: { grid: { display: false }, ticks: { maxTicksLimit: 9 } },
                 y: { ticks: { callback: v => v + 'R' } } } }
-  }));
+  });
 
   /* discipline */
   const disc = [['Compliant (' + clean.length + ')', exp(clean)],
                 ['Violated (' + vio.length + ')', exp(vio)]];
-  charts.push(new Chart(document.getElementById('disciplinechart'), {
+  new Chart(document.getElementById('disciplinechart'), {
     type: 'bar',
     data: { labels: disc.map(d => d[0]), datasets: [{ data: disc.map(d => d[1]), minBarLength: 4,
       backgroundColor: disc.map(d => d[1] >= 0 ? C.profit : C.loss), borderRadius: 6 }] },
@@ -398,13 +383,13 @@ function analyse(rows) {
       plugins: { tooltip: { callbacks: { label: c => 'expectancy ' + fR(c.parsed.x) } } },
       scales: { x: { ticks: { callback: v => v + 'R' } },
                 y: { grid: { display: false }, ticks: { autoSkip: false, crossAlign: 'far' } } } }
-  }));
+  });
 
   /* grade */
   const gd = {};
   rows.forEach(r => { (gd[gradeBucket(r.grade)] = gd[gradeBucket(r.grade)] || []).push(r); });
   const gKeys = ['A', 'B', 'C', 'D'].filter(k => gd[k]);
-  charts.push(new Chart(document.getElementById('grade'), {
+  new Chart(document.getElementById('grade'), {
     type: 'bar',
     data: { labels: gKeys.map(k => k + ' (' + gd[k].length + ')'),
       datasets: [{ data: gKeys.map(k => exp(gd[k])), borderRadius: 6,
@@ -412,10 +397,10 @@ function analyse(rows) {
     options: { maintainAspectRatio: false,
       plugins: { tooltip: { callbacks: { label: c => 'expectancy ' + fR(c.parsed.y) } } },
       scales: { y: { ticks: { callback: v => v + 'R' } }, x: { grid: { display: false } } } }
-  }));
+  });
 
   /* per-trade R */
-  charts.push(new Chart(document.getElementById('pertrade'), {
+  new Chart(document.getElementById('pertrade'), {
     type: 'bar',
     data: { labels: rows.map((r, i) => '#' + (i + 1) + ' ' + r.date),
       datasets: [{ data: rows.map(r => r.r),
@@ -424,7 +409,7 @@ function analyse(rows) {
     options: { maintainAspectRatio: false,
       plugins: { tooltip: { callbacks: { label: c => fR(c.parsed.y) } } },
       scales: { x: { display: false }, y: { ticks: { callback: v => v + 'R' } } } }
-  }));
+  });
 
   /* distribution */
   const bins = { '≤ -1R': 0, '-1R to 0': 0, 'BE': 0, '0 to 1.5R': 0, '1.5R to 3R': 0, '> 3R': 0 };
@@ -432,13 +417,13 @@ function analyse(rows) {
     if (t.result === 'BE') bins['BE']++;
     else if (r <= -1) bins['≤ -1R']++; else if (r < 0) bins['-1R to 0']++;
     else if (r <= 1.5) bins['0 to 1.5R']++; else if (r <= 3) bins['1.5R to 3R']++; else bins['> 3R']++; });
-  charts.push(new Chart(document.getElementById('rdist'), {
+  new Chart(document.getElementById('rdist'), {
     type: 'bar',
     data: { labels: Object.keys(bins), datasets: [{ data: Object.values(bins), borderRadius: 6,
       backgroundColor: [C.loss, C.loss, 'rgba(24,24,27,.25)', C.profit, C.profit, C.profit] }] },
     options: { maintainAspectRatio: false,
       scales: { y: { ticks: { precision: 0 } }, x: { grid: { display: false } } } }
-  }));
+  });
 
   /* type: breakout vs range-bound */
   const ty = {};
@@ -450,7 +435,7 @@ function analyse(rows) {
           l = ty[k].filter(r => r.result === 'Loss').length;
     return (w + l) ? 100 * w / (w + l) : 0;
   };
-  charts.push(new Chart(document.getElementById('typechart'), {
+  new Chart(document.getElementById('typechart'), {
     type: 'bar',
     data: { labels: tKeys.map(k => k + ' (' + ty[k].length + ')'),
       datasets: [{ data: tKeys.map(k => exp(ty[k])), borderRadius: 6, minBarLength: 4,
@@ -463,8 +448,8 @@ function analyse(rows) {
                      'win rate ' + tWr(tKeys[c.dataIndex]).toFixed(0) + '%'] } } },
       scales: { x: { ticks: { callback: v => v + 'R' } },
                 y: { grid: { display: false }, ticks: { autoSkip: false, crossAlign: 'far' } } } }
-  }));
-  charts.push(new Chart(document.getElementById('typewin'), {
+  });
+  new Chart(document.getElementById('typewin'), {
     type: 'bar',
     data: { labels: tKeys.map(k => k + ' (' + ty[k].length + ')'),
       datasets: [{ data: tKeys.map(tWr), borderRadius: 6,
@@ -473,7 +458,7 @@ function analyse(rows) {
       plugins: { tooltip: { callbacks: { label: c => c.parsed.y.toFixed(1) + '% win rate' } } },
       scales: { y: { ticks: { callback: v => v + '%' }, suggestedMax: 60 },
                 x: { grid: { display: false } } } }
-  }));
+  });
 
   /* table */
   document.getElementById('logtable').innerHTML =
@@ -487,41 +472,8 @@ function analyse(rows) {
       <td class="l"><span class="pill ${r.result.toLowerCase()}">${r.result}</span></td></tr>`).join('');
 }
 
-/* ---------- loaders ---------- */
-function loadEmbedded() {
-  document.getElementById('fname').textContent = 'my journal · embedded';
-  analyse(Papa.parse(MY_JOURNAL, { header: true, skipEmptyLines: true }).data);
-}
-loadEmbedded();
-document.getElementById('reload').addEventListener('click', e => { e.preventDefault(); loadEmbedded(); });
-
-function fromMasterSheet(wb) {
-  const raw = XLSX.utils.sheet_to_json(wb.Sheets['Master'], { header: 1, cellDates: true });
-  const out = [];
-  for (const row of raw.slice(1)) {
-    const [month, direction, date, no, result, r, v1, v2, v3, v4, v5, type, grade] = row;
-    if (!(date instanceof Date) || !['Win', 'Loss', 'BE'].includes(result)) continue;
-    out.push({ date: date.toISOString().slice(0, 10), direction, result, r,
-      violations: [v1, v2, v3, v4, v5].filter(Boolean).length, type, grade });
-  }
-  return out;
-}
-
-document.getElementById('csv').addEventListener('change', e => {
-  const f = e.target.files[0]; if (!f) return;
-  document.getElementById('fname').textContent = f.name;
-  if (/\.xlsx?$|\.xls$/i.test(f.name)) {
-    const reader = new FileReader();
-    reader.onload = ev => {
-      const wb = XLSX.read(ev.target.result, { cellDates: true });
-      if (wb.SheetNames.includes('Master')) { analyse(fromMasterSheet(wb)); return; }
-      analyse(XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { defval: '' }));
-    };
-    reader.readAsArrayBuffer(f);
-  } else {
-    Papa.parse(f, { header: true, skipEmptyLines: true, complete: res => analyse(res.data) });
-  }
-});
+/* ---------- data ---------- */
+analyse(Papa.parse(MY_JOURNAL, { header: true, skipEmptyLines: true }).data);
 
 /* ---------- sidebar toggle ---------- */
 document.getElementById('navtoggle').addEventListener('click', () =>

@@ -65,13 +65,22 @@ trade's result as a multiple of the amount risked.
 | `journal.csv` | Per-trade extract from the workbook |
 | `analysis.sql` | 10 SQLite queries: headline stats, payoff, compliance split, grade expectancy, monthly breakdowns, equity/drawdown (window functions), losing streaks |
 | `update_data.py` | Reads the workbook's Master sheet by header name, warns when a trade's typed Month label disagrees with its date (the date is the source of truth; the label is not exported), rewrites the CSV and the dashboard's embedded data; `--db-only` builds `journal.db` from the CSV |
-| `dashboard.html` | Single-file dashboard (Chart.js + SheetJS); opens with the data embedded, can load the original .xlsx or a CSV |
+| `dashboard.html` | Single-file dashboard (Chart.js); shows the trade data that `update_data.py` embeds in it |
 
 ## Run it
 
-Open `dashboard.html` in a browser. To load fresh data, click *Load journal* - it
-takes the original `.xlsx` workbook or a CSV with columns:
-`date, direction, result (Win/Loss/BE), r, violations, type, grade`.
+Open `dashboard.html` in a browser. It shows the data embedded in it.
+
+To refresh after logging new trades, run the pipeline on the workbook. It
+validates the data, rewrites `journal.csv` and updates the data inside
+`dashboard.html`; then reload the page:
+
+```
+python update_data.py path\to\Trading_Months_Stats.xlsx
+```
+
+Keep the workbook outside the repo folder: it holds personal financial sheets.
+`*.xlsx` is in `.gitignore` as a backstop, not the plan.
 
 For the SQL, build `journal.db` from the committed `journal.csv` (no workbook
 needed), then run the queries. Both lines work in PowerShell, cmd and bash:
