@@ -4,11 +4,12 @@ Design notes:
   * The real trading workbook is never used here. Every test that needs a
     workbook builds a small synthetic one in a temp directory, so the suite
     runs anywhere (including CI) and no personal trade data lives in the repo.
-  * The exceptions read the committed journal.csv: the --db-only test, and the
-    final test, which guards the published headline figures against regressions.
+  * The exceptions read the committed journal.csv (and dashboard.html): the
+    --db-only test, and the regression guards at the end, which catch drift.
 """
 import csv
 import datetime
+import re
 import shutil
 import sqlite3
 import subprocess
@@ -283,7 +284,7 @@ def test_db_only_builds_the_database_from_journal_csv_alone(tmp_path):
 
 
 # ==========================================================================
-# regression guard - 1 test
+# regression guards - 3 tests
 # ==========================================================================
 
 def test_committed_journal_reproduces_the_published_headline_figures():
@@ -298,6 +299,18 @@ def test_committed_journal_reproduces_the_published_headline_figures():
     viol = [t for t in trades if int(t['violations']) > 0]
     assert (len(clean), round(sum(t['r'] for t in clean), 1)) == (51, 17.1)
     assert (len(viol), round(sum(t['r'] for t in viol), 1)) == (30, -23.8)
+
+
+def test_dashboard_embed_matches_committed_journal_csv():
+    """dashboard.html's MY_JOURNAL block must be exactly what journal.csv produces."""
+    trades = list(csv.DictReader(open(REPO_ROOT / 'journal.csv', newline='')))
+    expected = build_embed(trades)
+    html = (REPO_ROOT / 'dashboard.html').read_text(encoding='utf-8')
+    blocks = re.findall(r'const MY_JOURNAL = `([^`]*)`;', html)
+    assert len(blocks) == 1, f"expected 1 MY_JOURNAL block in dashboard.html, found {len(blocks)}"
+    assert blocks[0] == expected, (
+        "dashboard.html's embedded data does not match journal.csv. Rerun "
+        "`python update_data.py <workbook>` to regenerate both; do not edit either by hand.")
 
 def test_net_r_rounds_half_up_deterministically():
     """-6.665 must round to -6.67 on every interpreter, not bankers'-round to -6.66."""
