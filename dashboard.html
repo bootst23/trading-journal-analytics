@@ -7,7 +7,6 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
 <style>
   :root {
     --bg: #f6f5f1; --hero: #eceee3; --card: #ffffff;
@@ -201,108 +200,109 @@
 </main>
 
 <script>
-const MY_JOURNAL = `date,trade_no,direction,result,r,violations,type,grade,exec_grade,mins_in_trade,mins_in_drawdown
-2026-02-05,1,Short,Win,1.72,0,Breakout,B+,,180,15
-2026-02-06,1,Long,Win,2.83,0,Breakout,A-,,165,0
-2026-02-08,2,Long,Win,0.735,1,Breakout,B-,,382,71
-2026-02-09,2,Short,Loss,-0.5,1,Breakout,B,,29,29
-2026-02-10,3,Short,Loss,-1,0,Breakout,B,,90,60
-2026-02-11,4,Short,Loss,-0.5,1,Breakout,C+,,22,21
-2026-02-12,5,Short,Loss,-1,1,Breakout,B-,,120,120
-2026-02-12,6,Short,Loss,-1,0,Breakout,A-,,1440,180
-2026-02-15,7,Short,BE,0,0,Breakout,B+,,597,120
-2026-02-17,8,Short,Loss,-0.5,3,Breakout,C,,6,6
-2026-02-18,9,Short,Loss,-1,4,Breakout,D,,60,60
-2026-02-18,10,Short,Loss,-1,1,Breakout,D,,66,42
-2026-02-19,3,Long,Loss,-1,1,Breakout,C+,,375,340
-2026-02-19,4,Long,Loss,-1,0,Range-Bound,C,,32,19
-2026-02-20,5,Long,BE,0,1,Range-Bound,C,,77,38
-2026-02-20,6,Long,Loss,-1,1,Breakout,C+,,77,20
-2026-02-24,11,Short,Win,1.49,0,Breakout,C+,,116,10
-2026-02-26,12,Short,Win,4.91,0,Range-Bound,C,,1605,340
-2026-02-27,13,Short,Win,0.725,0,Range-Bound,C,,82,32
-2026-03-01,1,Long,Loss,-0.5,0,Breakout,C,,1245,330
-2026-03-03,2,Long,Win,2.89,0,Breakout,B+,,237,0
-2026-03-05,1,Short,Loss,-1,1,Breakout,C,,15,15
-2026-03-05,2,Short,Win,2.82,0,Breakout,B,,647,18
-2026-03-08,3,Short,Loss,-0.5,1,Breakout,C,,45,30
-2026-03-09,4,Short,Loss,-1,0,Range-Bound,C+,,616,240
-2026-03-10,3,Long,Loss,-1,1,Breakout,C,,21,12
-2026-03-10,5,Short,Win,1,0,Range-Bound,C,,1109,2
-2026-03-11,4,Long,Loss,-1,0,Breakout,B-,,498,431
-2026-03-12,5,Long,Win,2.91,0,Breakout,C+,,532,25
-2026-03-13,6,Short,Win,2.76,0,Range-Bound,C+,,147,6
-2026-03-15,6,Long,Win,0.705,0,Breakout,B,,2,0
-2026-03-17,7,Long,Loss,-1,1,Range-Bound,B-,,397,89
-2026-03-18,7,Short,Win,1.82,0,Breakout,B-,,63,1
-2026-03-18,8,Long,Loss,-0.5,2,Breakout,D,,62,61
-2026-03-19,9,Long,Loss,-1,1,Range-Bound,B,,48,23
-2026-03-20,8,Short,Loss,-2,1,Breakout,B-,,388,156
-2026-03-22,10,Long,Loss,-0.5,0,Range-Bound,B,,252,199
-2026-03-23,9,Short,Win,0.1975,0,Range-Bound,B,,1056,0
-2026-03-24,10,Short,Loss,-1,1,Breakout,B+,,295,56
-2026-03-25,11,Short,BE,0,2,Range-Bound,B-,,121,30
-2026-03-26,12,Short,Win,4.34,0,Breakout,B+,,1183,21
-2026-03-31,1,Long,BE,0,0,Breakout,B,,1944,165
-2026-04-01,2,Long,Loss,-1,1,Breakout,B,,55,45
-2026-04-02,3,Long,Loss,-1,1,Breakout,B+,,571,514
-2026-04-03,1,Short,Loss,-1,0,Range-Bound,B,,781,720
-2026-04-07,2,Short,Loss,-1,0,Breakout,B,,229,95
-2026-04-08,3,Short,Loss,-1,0,Breakout,B+,,992,720
-2026-04-09,4,Short,Loss,-1,0,Breakout,B+,,28,24
-2026-04-10,4,Long,Win,2.08,0,Breakout,B,,95,7
-2026-04-10,5,Short,Loss,-1,1,Range-Bound,B,,61,61
-2026-04-12,6,Short,Loss,-1,0,Breakout,B+,,921,921
-2026-04-13,7,Short,Loss,-0.25,0,Range-Bound,C+,,160,160
-2026-04-14,8,Short,Loss,-1.6875,0,Range-Bound,B+,,3075,1335
-2026-04-15,9,Short,Loss,-1,0,Breakout,B,,17,17
-2026-04-15,10,Short,Loss,-0.5,1,Breakout,B,,210,180
-2026-04-16,5,Long,Win,0.9,0,Range-Bound,A,,883,232
-2026-04-19,6,Long,Loss,-1,0,Breakout,A,,49,20
-2026-04-19,11,Short,Win,1,0,Range-Bound,B,,78,0
-2026-04-21,7,Long,Loss,-1,0,Range-Bound,B,,24,24
-2026-04-21,12,Short,Loss,-1,0,Breakout,C,,527,210
-2026-04-22,13,Short,BE,0,0,Range-Bound,B,,603,79
-2026-04-23,8,Long,Loss,-1,0,Range-Bound,B,,192,34
-2026-04-24,14,Short,Loss,-0.75,0,Range-Bound,C,,34,34
-2026-04-26,9,Long,Win,3.1,0,Breakout,A+,,406,45
-2026-04-27,10,Long,Loss,-1,0,Range-Bound,C,,31,11
-2026-04-30,15,Short,Loss,-1,1,Range-Bound,C,,644,644
-2026-05-03,1,Short,Loss,-1,1,Range-Bound,B,,92,92
-2026-05-05,1,Long,Loss,-0.75,2,Breakout,C-,,156,156
-2026-05-06,2,Short,Loss,-0.75,1,Breakout,B,,5310,1395
-2026-05-10,2,Long,Loss,-1,0,Breakout,B,,585,1
-2026-05-12,3,Short,Loss,-0.75,0,Breakout,B,,549,471
-2026-05-27,4,Short,Win,0.54,0,Breakout,B+,,556,105
-2026-06-03,1,Short,Win,3.8,0,Breakout,A-,,586,0
-2026-06-05,2,Short,Loss,-1,0,Breakout,D,,147,42
-2026-06-10,1,Long,Loss,-1,2,Breakout,C,,105,83
-2026-06-11,3,Short,Loss,-1,0,Range-Bound,B,,152,4
-2026-06-16,2,Long,Loss,-1,1,Range-Bound,C,,661,643
-2026-06-17,3,Long,BE,0,0,Range-Bound,B,,142,1
-2026-06-23,4,Short,Loss,-1,2,Breakout,C,,330,330
-2026-06-25,4,Long,Loss,-1,0,Range-Bound,D,,570,195
-2026-06-26,5,Short,Loss,-1,0,Range-Bound,B,,1200,780
-2026-07-15,1,Short,Win,2.25,0,Range-Bound,A,,2005,5
-2026-07-22,1,Long,Loss,-1,1,Range-Bound,B,,1510,754
-2026-07-23,2,Long,Loss,-1,2,Range-Bound,C,,1357,120
-2026-07-28,3,Long,BE,0,0,Range-Bound,A-,,1308,0
-2026-07-29,4,Long,BE,0,1,Range-Bound,B,,2099,1
-2026-08-04,1,Long,Loss,-0.625,1,Breakout,A,,8585,15
-2026-08-13,2,Long,BE,0,1,Range-Bound,C,,803,0
-2026-08-17,1,Short,Loss,-1,2,Range-Bound,C-,,65,65
-2026-08-27,3,Long,Win,0.665,0,Breakout,A,,847,0
-2026-08-27,4,Long,Loss,-1,2,Range-Bound,C,,611,0
-2026-08-31,1,Short,Win,0.77,1,Range-Bound,B-,C-,531,45
-2026-09-01,2,Short,Win,2.06975,0,Breakout,A-,A,209,0
-2026-09-02,1,Long,Win,0.25,2,Breakout,C-,B+,905,360
-2026-09-09,3,Short,Win,2.64,0,Range-Bound,B+,A,508,0
-2026-09-15,2,Long,Loss,-1,3,Range-Bound,D,B-,286,11
-2026-09-20,3,Long,Win,0.515,2,Range-Bound,B-,A-,1032,30
-2026-09-21,4,Long,Loss,-1,0,Breakout,B-,A,2858,630
-2026-09-24,5,Long,Loss,-1,2,Range-Bound,C,C,4334,2880
-2026-09-30,6,Long,Loss,-1,0,Breakout,C,A,220,220
-2026-10-01,7,Long,Win,2.08,0,Breakout,C+,A,1211,0`;
+const MY_JOURNAL = [
+{"date": "2026-02-05", "trade_no": "1", "direction": "Short", "result": "Win", "r": "1.72", "violations": "0", "type": "Breakout", "grade": "B+", "exec_grade": "", "mins_in_trade": "180", "mins_in_drawdown": "15"},
+{"date": "2026-02-06", "trade_no": "1", "direction": "Long", "result": "Win", "r": "2.83", "violations": "0", "type": "Breakout", "grade": "A-", "exec_grade": "", "mins_in_trade": "165", "mins_in_drawdown": "0"},
+{"date": "2026-02-08", "trade_no": "2", "direction": "Long", "result": "Win", "r": "0.735", "violations": "1", "type": "Breakout", "grade": "B-", "exec_grade": "", "mins_in_trade": "382", "mins_in_drawdown": "71"},
+{"date": "2026-02-09", "trade_no": "2", "direction": "Short", "result": "Loss", "r": "-0.5", "violations": "1", "type": "Breakout", "grade": "B", "exec_grade": "", "mins_in_trade": "29", "mins_in_drawdown": "29"},
+{"date": "2026-02-10", "trade_no": "3", "direction": "Short", "result": "Loss", "r": "-1", "violations": "0", "type": "Breakout", "grade": "B", "exec_grade": "", "mins_in_trade": "90", "mins_in_drawdown": "60"},
+{"date": "2026-02-11", "trade_no": "4", "direction": "Short", "result": "Loss", "r": "-0.5", "violations": "1", "type": "Breakout", "grade": "C+", "exec_grade": "", "mins_in_trade": "22", "mins_in_drawdown": "21"},
+{"date": "2026-02-12", "trade_no": "5", "direction": "Short", "result": "Loss", "r": "-1", "violations": "1", "type": "Breakout", "grade": "B-", "exec_grade": "", "mins_in_trade": "120", "mins_in_drawdown": "120"},
+{"date": "2026-02-12", "trade_no": "6", "direction": "Short", "result": "Loss", "r": "-1", "violations": "0", "type": "Breakout", "grade": "A-", "exec_grade": "", "mins_in_trade": "1440", "mins_in_drawdown": "180"},
+{"date": "2026-02-15", "trade_no": "7", "direction": "Short", "result": "BE", "r": "0", "violations": "0", "type": "Breakout", "grade": "B+", "exec_grade": "", "mins_in_trade": "597", "mins_in_drawdown": "120"},
+{"date": "2026-02-17", "trade_no": "8", "direction": "Short", "result": "Loss", "r": "-0.5", "violations": "3", "type": "Breakout", "grade": "C", "exec_grade": "", "mins_in_trade": "6", "mins_in_drawdown": "6"},
+{"date": "2026-02-18", "trade_no": "9", "direction": "Short", "result": "Loss", "r": "-1", "violations": "4", "type": "Breakout", "grade": "D", "exec_grade": "", "mins_in_trade": "60", "mins_in_drawdown": "60"},
+{"date": "2026-02-18", "trade_no": "10", "direction": "Short", "result": "Loss", "r": "-1", "violations": "1", "type": "Breakout", "grade": "D", "exec_grade": "", "mins_in_trade": "66", "mins_in_drawdown": "42"},
+{"date": "2026-02-19", "trade_no": "3", "direction": "Long", "result": "Loss", "r": "-1", "violations": "1", "type": "Breakout", "grade": "C+", "exec_grade": "", "mins_in_trade": "375", "mins_in_drawdown": "340"},
+{"date": "2026-02-19", "trade_no": "4", "direction": "Long", "result": "Loss", "r": "-1", "violations": "0", "type": "Range-Bound", "grade": "C", "exec_grade": "", "mins_in_trade": "32", "mins_in_drawdown": "19"},
+{"date": "2026-02-20", "trade_no": "5", "direction": "Long", "result": "BE", "r": "0", "violations": "1", "type": "Range-Bound", "grade": "C", "exec_grade": "", "mins_in_trade": "77", "mins_in_drawdown": "38"},
+{"date": "2026-02-20", "trade_no": "6", "direction": "Long", "result": "Loss", "r": "-1", "violations": "1", "type": "Breakout", "grade": "C+", "exec_grade": "", "mins_in_trade": "77", "mins_in_drawdown": "20"},
+{"date": "2026-02-24", "trade_no": "11", "direction": "Short", "result": "Win", "r": "1.49", "violations": "0", "type": "Breakout", "grade": "C+", "exec_grade": "", "mins_in_trade": "116", "mins_in_drawdown": "10"},
+{"date": "2026-02-26", "trade_no": "12", "direction": "Short", "result": "Win", "r": "4.91", "violations": "0", "type": "Range-Bound", "grade": "C", "exec_grade": "", "mins_in_trade": "1605", "mins_in_drawdown": "340"},
+{"date": "2026-02-27", "trade_no": "13", "direction": "Short", "result": "Win", "r": "0.725", "violations": "0", "type": "Range-Bound", "grade": "C", "exec_grade": "", "mins_in_trade": "82", "mins_in_drawdown": "32"},
+{"date": "2026-03-01", "trade_no": "1", "direction": "Long", "result": "Loss", "r": "-0.5", "violations": "0", "type": "Breakout", "grade": "C", "exec_grade": "", "mins_in_trade": "1245", "mins_in_drawdown": "330"},
+{"date": "2026-03-03", "trade_no": "2", "direction": "Long", "result": "Win", "r": "2.89", "violations": "0", "type": "Breakout", "grade": "B+", "exec_grade": "", "mins_in_trade": "237", "mins_in_drawdown": "0"},
+{"date": "2026-03-05", "trade_no": "1", "direction": "Short", "result": "Loss", "r": "-1", "violations": "1", "type": "Breakout", "grade": "C", "exec_grade": "", "mins_in_trade": "15", "mins_in_drawdown": "15"},
+{"date": "2026-03-05", "trade_no": "2", "direction": "Short", "result": "Win", "r": "2.82", "violations": "0", "type": "Breakout", "grade": "B", "exec_grade": "", "mins_in_trade": "647", "mins_in_drawdown": "18"},
+{"date": "2026-03-08", "trade_no": "3", "direction": "Short", "result": "Loss", "r": "-0.5", "violations": "1", "type": "Breakout", "grade": "C", "exec_grade": "", "mins_in_trade": "45", "mins_in_drawdown": "30"},
+{"date": "2026-03-09", "trade_no": "4", "direction": "Short", "result": "Loss", "r": "-1", "violations": "0", "type": "Range-Bound", "grade": "C+", "exec_grade": "", "mins_in_trade": "616", "mins_in_drawdown": "240"},
+{"date": "2026-03-10", "trade_no": "3", "direction": "Long", "result": "Loss", "r": "-1", "violations": "1", "type": "Breakout", "grade": "C", "exec_grade": "", "mins_in_trade": "21", "mins_in_drawdown": "12"},
+{"date": "2026-03-10", "trade_no": "5", "direction": "Short", "result": "Win", "r": "1", "violations": "0", "type": "Range-Bound", "grade": "C", "exec_grade": "", "mins_in_trade": "1109", "mins_in_drawdown": "2"},
+{"date": "2026-03-11", "trade_no": "4", "direction": "Long", "result": "Loss", "r": "-1", "violations": "0", "type": "Breakout", "grade": "B-", "exec_grade": "", "mins_in_trade": "498", "mins_in_drawdown": "431"},
+{"date": "2026-03-12", "trade_no": "5", "direction": "Long", "result": "Win", "r": "2.91", "violations": "0", "type": "Breakout", "grade": "C+", "exec_grade": "", "mins_in_trade": "532", "mins_in_drawdown": "25"},
+{"date": "2026-03-13", "trade_no": "6", "direction": "Short", "result": "Win", "r": "2.76", "violations": "0", "type": "Range-Bound", "grade": "C+", "exec_grade": "", "mins_in_trade": "147", "mins_in_drawdown": "6"},
+{"date": "2026-03-15", "trade_no": "6", "direction": "Long", "result": "Win", "r": "0.705", "violations": "0", "type": "Breakout", "grade": "B", "exec_grade": "", "mins_in_trade": "2", "mins_in_drawdown": "0"},
+{"date": "2026-03-17", "trade_no": "7", "direction": "Long", "result": "Loss", "r": "-1", "violations": "1", "type": "Range-Bound", "grade": "B-", "exec_grade": "", "mins_in_trade": "397", "mins_in_drawdown": "89"},
+{"date": "2026-03-18", "trade_no": "7", "direction": "Short", "result": "Win", "r": "1.82", "violations": "0", "type": "Breakout", "grade": "B-", "exec_grade": "", "mins_in_trade": "63", "mins_in_drawdown": "1"},
+{"date": "2026-03-18", "trade_no": "8", "direction": "Long", "result": "Loss", "r": "-0.5", "violations": "2", "type": "Breakout", "grade": "D", "exec_grade": "", "mins_in_trade": "62", "mins_in_drawdown": "61"},
+{"date": "2026-03-19", "trade_no": "9", "direction": "Long", "result": "Loss", "r": "-1", "violations": "1", "type": "Range-Bound", "grade": "B", "exec_grade": "", "mins_in_trade": "48", "mins_in_drawdown": "23"},
+{"date": "2026-03-20", "trade_no": "8", "direction": "Short", "result": "Loss", "r": "-2", "violations": "1", "type": "Breakout", "grade": "B-", "exec_grade": "", "mins_in_trade": "388", "mins_in_drawdown": "156"},
+{"date": "2026-03-22", "trade_no": "10", "direction": "Long", "result": "Loss", "r": "-0.5", "violations": "0", "type": "Range-Bound", "grade": "B", "exec_grade": "", "mins_in_trade": "252", "mins_in_drawdown": "199"},
+{"date": "2026-03-23", "trade_no": "9", "direction": "Short", "result": "Win", "r": "0.1975", "violations": "0", "type": "Range-Bound", "grade": "B", "exec_grade": "", "mins_in_trade": "1056", "mins_in_drawdown": "0"},
+{"date": "2026-03-24", "trade_no": "10", "direction": "Short", "result": "Loss", "r": "-1", "violations": "1", "type": "Breakout", "grade": "B+", "exec_grade": "", "mins_in_trade": "295", "mins_in_drawdown": "56"},
+{"date": "2026-03-25", "trade_no": "11", "direction": "Short", "result": "BE", "r": "0", "violations": "2", "type": "Range-Bound", "grade": "B-", "exec_grade": "", "mins_in_trade": "121", "mins_in_drawdown": "30"},
+{"date": "2026-03-26", "trade_no": "12", "direction": "Short", "result": "Win", "r": "4.34", "violations": "0", "type": "Breakout", "grade": "B+", "exec_grade": "", "mins_in_trade": "1183", "mins_in_drawdown": "21"},
+{"date": "2026-03-31", "trade_no": "1", "direction": "Long", "result": "BE", "r": "0", "violations": "0", "type": "Breakout", "grade": "B", "exec_grade": "", "mins_in_trade": "1944", "mins_in_drawdown": "165"},
+{"date": "2026-04-01", "trade_no": "2", "direction": "Long", "result": "Loss", "r": "-1", "violations": "1", "type": "Breakout", "grade": "B", "exec_grade": "", "mins_in_trade": "55", "mins_in_drawdown": "45"},
+{"date": "2026-04-02", "trade_no": "3", "direction": "Long", "result": "Loss", "r": "-1", "violations": "1", "type": "Breakout", "grade": "B+", "exec_grade": "", "mins_in_trade": "571", "mins_in_drawdown": "514"},
+{"date": "2026-04-03", "trade_no": "1", "direction": "Short", "result": "Loss", "r": "-1", "violations": "0", "type": "Range-Bound", "grade": "B", "exec_grade": "", "mins_in_trade": "781", "mins_in_drawdown": "720"},
+{"date": "2026-04-07", "trade_no": "2", "direction": "Short", "result": "Loss", "r": "-1", "violations": "0", "type": "Breakout", "grade": "B", "exec_grade": "", "mins_in_trade": "229", "mins_in_drawdown": "95"},
+{"date": "2026-04-08", "trade_no": "3", "direction": "Short", "result": "Loss", "r": "-1", "violations": "0", "type": "Breakout", "grade": "B+", "exec_grade": "", "mins_in_trade": "992", "mins_in_drawdown": "720"},
+{"date": "2026-04-09", "trade_no": "4", "direction": "Short", "result": "Loss", "r": "-1", "violations": "0", "type": "Breakout", "grade": "B+", "exec_grade": "", "mins_in_trade": "28", "mins_in_drawdown": "24"},
+{"date": "2026-04-10", "trade_no": "4", "direction": "Long", "result": "Win", "r": "2.08", "violations": "0", "type": "Breakout", "grade": "B", "exec_grade": "", "mins_in_trade": "95", "mins_in_drawdown": "7"},
+{"date": "2026-04-10", "trade_no": "5", "direction": "Short", "result": "Loss", "r": "-1", "violations": "1", "type": "Range-Bound", "grade": "B", "exec_grade": "", "mins_in_trade": "61", "mins_in_drawdown": "61"},
+{"date": "2026-04-12", "trade_no": "6", "direction": "Short", "result": "Loss", "r": "-1", "violations": "0", "type": "Breakout", "grade": "B+", "exec_grade": "", "mins_in_trade": "921", "mins_in_drawdown": "921"},
+{"date": "2026-04-13", "trade_no": "7", "direction": "Short", "result": "Loss", "r": "-0.25", "violations": "0", "type": "Range-Bound", "grade": "C+", "exec_grade": "", "mins_in_trade": "160", "mins_in_drawdown": "160"},
+{"date": "2026-04-14", "trade_no": "8", "direction": "Short", "result": "Loss", "r": "-1.6875", "violations": "0", "type": "Range-Bound", "grade": "B+", "exec_grade": "", "mins_in_trade": "3075", "mins_in_drawdown": "1335"},
+{"date": "2026-04-15", "trade_no": "9", "direction": "Short", "result": "Loss", "r": "-1", "violations": "0", "type": "Breakout", "grade": "B", "exec_grade": "", "mins_in_trade": "17", "mins_in_drawdown": "17"},
+{"date": "2026-04-15", "trade_no": "10", "direction": "Short", "result": "Loss", "r": "-0.5", "violations": "1", "type": "Breakout", "grade": "B", "exec_grade": "", "mins_in_trade": "210", "mins_in_drawdown": "180"},
+{"date": "2026-04-16", "trade_no": "5", "direction": "Long", "result": "Win", "r": "0.9", "violations": "0", "type": "Range-Bound", "grade": "A", "exec_grade": "", "mins_in_trade": "883", "mins_in_drawdown": "232"},
+{"date": "2026-04-19", "trade_no": "6", "direction": "Long", "result": "Loss", "r": "-1", "violations": "0", "type": "Breakout", "grade": "A", "exec_grade": "", "mins_in_trade": "49", "mins_in_drawdown": "20"},
+{"date": "2026-04-19", "trade_no": "11", "direction": "Short", "result": "Win", "r": "1", "violations": "0", "type": "Range-Bound", "grade": "B", "exec_grade": "", "mins_in_trade": "78", "mins_in_drawdown": "0"},
+{"date": "2026-04-21", "trade_no": "7", "direction": "Long", "result": "Loss", "r": "-1", "violations": "0", "type": "Range-Bound", "grade": "B", "exec_grade": "", "mins_in_trade": "24", "mins_in_drawdown": "24"},
+{"date": "2026-04-21", "trade_no": "12", "direction": "Short", "result": "Loss", "r": "-1", "violations": "0", "type": "Breakout", "grade": "C", "exec_grade": "", "mins_in_trade": "527", "mins_in_drawdown": "210"},
+{"date": "2026-04-22", "trade_no": "13", "direction": "Short", "result": "BE", "r": "0", "violations": "0", "type": "Range-Bound", "grade": "B", "exec_grade": "", "mins_in_trade": "603", "mins_in_drawdown": "79"},
+{"date": "2026-04-23", "trade_no": "8", "direction": "Long", "result": "Loss", "r": "-1", "violations": "0", "type": "Range-Bound", "grade": "B", "exec_grade": "", "mins_in_trade": "192", "mins_in_drawdown": "34"},
+{"date": "2026-04-24", "trade_no": "14", "direction": "Short", "result": "Loss", "r": "-0.75", "violations": "0", "type": "Range-Bound", "grade": "C", "exec_grade": "", "mins_in_trade": "34", "mins_in_drawdown": "34"},
+{"date": "2026-04-26", "trade_no": "9", "direction": "Long", "result": "Win", "r": "3.1", "violations": "0", "type": "Breakout", "grade": "A+", "exec_grade": "", "mins_in_trade": "406", "mins_in_drawdown": "45"},
+{"date": "2026-04-27", "trade_no": "10", "direction": "Long", "result": "Loss", "r": "-1", "violations": "0", "type": "Range-Bound", "grade": "C", "exec_grade": "", "mins_in_trade": "31", "mins_in_drawdown": "11"},
+{"date": "2026-04-30", "trade_no": "15", "direction": "Short", "result": "Loss", "r": "-1", "violations": "1", "type": "Range-Bound", "grade": "C", "exec_grade": "", "mins_in_trade": "644", "mins_in_drawdown": "644"},
+{"date": "2026-05-03", "trade_no": "1", "direction": "Short", "result": "Loss", "r": "-1", "violations": "1", "type": "Range-Bound", "grade": "B", "exec_grade": "", "mins_in_trade": "92", "mins_in_drawdown": "92"},
+{"date": "2026-05-05", "trade_no": "1", "direction": "Long", "result": "Loss", "r": "-0.75", "violations": "2", "type": "Breakout", "grade": "C-", "exec_grade": "", "mins_in_trade": "156", "mins_in_drawdown": "156"},
+{"date": "2026-05-06", "trade_no": "2", "direction": "Short", "result": "Loss", "r": "-0.75", "violations": "1", "type": "Breakout", "grade": "B", "exec_grade": "", "mins_in_trade": "5310", "mins_in_drawdown": "1395"},
+{"date": "2026-05-10", "trade_no": "2", "direction": "Long", "result": "Loss", "r": "-1", "violations": "0", "type": "Breakout", "grade": "B", "exec_grade": "", "mins_in_trade": "585", "mins_in_drawdown": "1"},
+{"date": "2026-05-12", "trade_no": "3", "direction": "Short", "result": "Loss", "r": "-0.75", "violations": "0", "type": "Breakout", "grade": "B", "exec_grade": "", "mins_in_trade": "549", "mins_in_drawdown": "471"},
+{"date": "2026-05-27", "trade_no": "4", "direction": "Short", "result": "Win", "r": "0.54", "violations": "0", "type": "Breakout", "grade": "B+", "exec_grade": "", "mins_in_trade": "556", "mins_in_drawdown": "105"},
+{"date": "2026-06-03", "trade_no": "1", "direction": "Short", "result": "Win", "r": "3.8", "violations": "0", "type": "Breakout", "grade": "A-", "exec_grade": "", "mins_in_trade": "586", "mins_in_drawdown": "0"},
+{"date": "2026-06-05", "trade_no": "2", "direction": "Short", "result": "Loss", "r": "-1", "violations": "0", "type": "Breakout", "grade": "D", "exec_grade": "", "mins_in_trade": "147", "mins_in_drawdown": "42"},
+{"date": "2026-06-10", "trade_no": "1", "direction": "Long", "result": "Loss", "r": "-1", "violations": "2", "type": "Breakout", "grade": "C", "exec_grade": "", "mins_in_trade": "105", "mins_in_drawdown": "83"},
+{"date": "2026-06-11", "trade_no": "3", "direction": "Short", "result": "Loss", "r": "-1", "violations": "0", "type": "Range-Bound", "grade": "B", "exec_grade": "", "mins_in_trade": "152", "mins_in_drawdown": "4"},
+{"date": "2026-06-16", "trade_no": "2", "direction": "Long", "result": "Loss", "r": "-1", "violations": "1", "type": "Range-Bound", "grade": "C", "exec_grade": "", "mins_in_trade": "661", "mins_in_drawdown": "643"},
+{"date": "2026-06-17", "trade_no": "3", "direction": "Long", "result": "BE", "r": "0", "violations": "0", "type": "Range-Bound", "grade": "B", "exec_grade": "", "mins_in_trade": "142", "mins_in_drawdown": "1"},
+{"date": "2026-06-23", "trade_no": "4", "direction": "Short", "result": "Loss", "r": "-1", "violations": "2", "type": "Breakout", "grade": "C", "exec_grade": "", "mins_in_trade": "330", "mins_in_drawdown": "330"},
+{"date": "2026-06-25", "trade_no": "4", "direction": "Long", "result": "Loss", "r": "-1", "violations": "0", "type": "Range-Bound", "grade": "D", "exec_grade": "", "mins_in_trade": "570", "mins_in_drawdown": "195"},
+{"date": "2026-06-26", "trade_no": "5", "direction": "Short", "result": "Loss", "r": "-1", "violations": "0", "type": "Range-Bound", "grade": "B", "exec_grade": "", "mins_in_trade": "1200", "mins_in_drawdown": "780"},
+{"date": "2026-07-15", "trade_no": "1", "direction": "Short", "result": "Win", "r": "2.25", "violations": "0", "type": "Range-Bound", "grade": "A", "exec_grade": "", "mins_in_trade": "2005", "mins_in_drawdown": "5"},
+{"date": "2026-07-22", "trade_no": "1", "direction": "Long", "result": "Loss", "r": "-1", "violations": "1", "type": "Range-Bound", "grade": "B", "exec_grade": "", "mins_in_trade": "1510", "mins_in_drawdown": "754"},
+{"date": "2026-07-23", "trade_no": "2", "direction": "Long", "result": "Loss", "r": "-1", "violations": "2", "type": "Range-Bound", "grade": "C", "exec_grade": "", "mins_in_trade": "1357", "mins_in_drawdown": "120"},
+{"date": "2026-07-28", "trade_no": "3", "direction": "Long", "result": "BE", "r": "0", "violations": "0", "type": "Range-Bound", "grade": "A-", "exec_grade": "", "mins_in_trade": "1308", "mins_in_drawdown": "0"},
+{"date": "2026-07-29", "trade_no": "4", "direction": "Long", "result": "BE", "r": "0", "violations": "1", "type": "Range-Bound", "grade": "B", "exec_grade": "", "mins_in_trade": "2099", "mins_in_drawdown": "1"},
+{"date": "2026-08-04", "trade_no": "1", "direction": "Long", "result": "Loss", "r": "-0.625", "violations": "1", "type": "Breakout", "grade": "A", "exec_grade": "", "mins_in_trade": "8585", "mins_in_drawdown": "15"},
+{"date": "2026-08-13", "trade_no": "2", "direction": "Long", "result": "BE", "r": "0", "violations": "1", "type": "Range-Bound", "grade": "C", "exec_grade": "", "mins_in_trade": "803", "mins_in_drawdown": "0"},
+{"date": "2026-08-17", "trade_no": "1", "direction": "Short", "result": "Loss", "r": "-1", "violations": "2", "type": "Range-Bound", "grade": "C-", "exec_grade": "", "mins_in_trade": "65", "mins_in_drawdown": "65"},
+{"date": "2026-08-27", "trade_no": "3", "direction": "Long", "result": "Win", "r": "0.665", "violations": "0", "type": "Breakout", "grade": "A", "exec_grade": "", "mins_in_trade": "847", "mins_in_drawdown": "0"},
+{"date": "2026-08-27", "trade_no": "4", "direction": "Long", "result": "Loss", "r": "-1", "violations": "2", "type": "Range-Bound", "grade": "C", "exec_grade": "", "mins_in_trade": "611", "mins_in_drawdown": "0"},
+{"date": "2026-08-31", "trade_no": "1", "direction": "Short", "result": "Win", "r": "0.77", "violations": "1", "type": "Range-Bound", "grade": "B-", "exec_grade": "C-", "mins_in_trade": "531", "mins_in_drawdown": "45"},
+{"date": "2026-09-01", "trade_no": "2", "direction": "Short", "result": "Win", "r": "2.06975", "violations": "0", "type": "Breakout", "grade": "A-", "exec_grade": "A", "mins_in_trade": "209", "mins_in_drawdown": "0"},
+{"date": "2026-09-02", "trade_no": "1", "direction": "Long", "result": "Win", "r": "0.25", "violations": "2", "type": "Breakout", "grade": "C-", "exec_grade": "B+", "mins_in_trade": "905", "mins_in_drawdown": "360"},
+{"date": "2026-09-09", "trade_no": "3", "direction": "Short", "result": "Win", "r": "2.64", "violations": "0", "type": "Range-Bound", "grade": "B+", "exec_grade": "A", "mins_in_trade": "508", "mins_in_drawdown": "0"},
+{"date": "2026-09-15", "trade_no": "2", "direction": "Long", "result": "Loss", "r": "-1", "violations": "3", "type": "Range-Bound", "grade": "D", "exec_grade": "B-", "mins_in_trade": "286", "mins_in_drawdown": "11"},
+{"date": "2026-09-20", "trade_no": "3", "direction": "Long", "result": "Win", "r": "0.515", "violations": "2", "type": "Range-Bound", "grade": "B-", "exec_grade": "A-", "mins_in_trade": "1032", "mins_in_drawdown": "30"},
+{"date": "2026-09-21", "trade_no": "4", "direction": "Long", "result": "Loss", "r": "-1", "violations": "0", "type": "Breakout", "grade": "B-", "exec_grade": "A", "mins_in_trade": "2858", "mins_in_drawdown": "630"},
+{"date": "2026-09-24", "trade_no": "5", "direction": "Long", "result": "Loss", "r": "-1", "violations": "2", "type": "Range-Bound", "grade": "C", "exec_grade": "C", "mins_in_trade": "4334", "mins_in_drawdown": "2880"},
+{"date": "2026-09-30", "trade_no": "6", "direction": "Long", "result": "Loss", "r": "-1", "violations": "0", "type": "Breakout", "grade": "C", "exec_grade": "A", "mins_in_trade": "220", "mins_in_drawdown": "220"},
+{"date": "2026-10-01", "trade_no": "7", "direction": "Long", "result": "Win", "r": "2.08", "violations": "0", "type": "Breakout", "grade": "C+", "exec_grade": "A", "mins_in_trade": "1211", "mins_in_drawdown": "0"}
+];
 
 const css = v => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
 const C = { profit: css('--profit'), loss: css('--loss'), equity: css('--equity'),
@@ -533,7 +533,7 @@ function analyse(rows) {
 }
 
 /* ---------- data ---------- */
-analyse(Papa.parse(MY_JOURNAL, { header: true, skipEmptyLines: true }).data);
+analyse(MY_JOURNAL);
 
 /* ---------- sidebar toggle ---------- */
 document.getElementById('navtoggle').addEventListener('click', () =>

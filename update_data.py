@@ -21,7 +21,7 @@ What it does:
 
 Requires: pip install openpyxl
 """
-import sys, re, csv, sqlite3, datetime
+import sys, re, csv, json, sqlite3, datetime
 from pathlib import Path
 from decimal import Decimal, ROUND_HALF_UP
 
@@ -46,7 +46,9 @@ SCHEMA = """CREATE TABLE trades (
 EMBED_COLUMNS = ['date', 'trade_no', 'direction', 'result', 'r', 'violations', 'type', 'grade',
                  'exec_grade', 'mins_in_trade', 'mins_in_drawdown']
 
-EMBED_PATTERN = r'const MY_JOURNAL = `[^`]*`;'
+# One JSON row per line between '[' and '];'. json.dumps escapes newlines, so a
+# line holding only '];' can only be the end of the block.
+EMBED_PATTERN = re.compile(r'^const MY_JOURNAL = \[$.*?^\];$', re.M | re.S)
 
 # Master sheet headers extract() needs, matched by text (trimmed), not position.
 # 'D. helper' is deliberately not read: it is a second copy of the drawdown
@@ -89,11 +91,17 @@ def parse_duration(value):
 
 
 def build_embed(trades):
-    """Turn trade dicts into the CSV text the dashboard embeds (EMBED_COLUMNS)."""
-    lines = [','.join(EMBED_COLUMNS)]
-    for t in trades:
-        lines.append(','.join(str(t[c]) for c in EMBED_COLUMNS))
-    return '\n'.join(lines)
+    """Turn trade dicts into the JS array literal the dashboard embeds, one row per line.
+
+    JSON is valid JS, so commas and quotes in any field are safe. Values are strings,
+    as they were in the CSV embed, and a blank cell (None) is '' as csv.writer writes it,
+    so a workbook extract and journal.csv embed alike.
+    '<' is escaped so a '</script>' in a field cannot end the script block.
+    """
+    rows = (json.dumps({c: '' if t[c] is None else str(t[c]) for c in EMBED_COLUMNS})
+            .replace('<', '\\u003c')
+            for t in trades)
+    return '[\n' + ',\n'.join(rows) + '\n]'
 
 
 def replace_embed(html, embed):
@@ -102,11 +110,7 @@ def replace_embed(html, embed):
     Raises PipelineError unless exactly one block was found, so a renamed or
     duplicated anchor can never silently corrupt the dashboard.
     """
-    if '`' in embed:
-        raise PipelineError("Embed data contains a backtick - it would break the JS template literal.")
-    new_html, n = re.subn(EMBED_PATTERN,
-                          lambda _: 'const MY_JOURNAL = `' + embed + '`;',
-                          html)
+    new_html, n = EMBED_PATTERN.subn(lambda _: 'const MY_JOURNAL = ' + embed + ';', html)
     if n != 1:
         raise PipelineError(
             f"Expected exactly 1 MY_JOURNAL block in dashboard.html, found {n}.")

@@ -9,7 +9,8 @@ Design notes:
 """
 import csv
 import datetime
-import re
+import json
+import os
 import shutil
 import sqlite3
 import subprocess
@@ -23,7 +24,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from update_data import (  # noqa: E402
     PipelineError, build_embed, replace_embed, summarise,
-    extract, write_csv, load_database, parse_duration, FIELDNAMES, EMBED_COLUMNS,
+    extract, write_csv, load_database, parse_duration, FIELDNAMES, EMBED_COLUMNS, EMBED_PATTERN,
 )
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
@@ -75,68 +76,93 @@ def sample_trades():
 # build_embed - 4 tests
 # ==========================================================================
 
-def test_embed_header_is_the_documented_embed_columns(sample_trades):
-    header = build_embed(sample_trades).splitlines()[0]
-    assert header == ('date,trade_no,direction,result,r,violations,type,grade,'
-                      'exec_grade,mins_in_trade,mins_in_drawdown')
-    assert header.split(',') == EMBED_COLUMNS
+def test_embed_is_one_object_per_trade_with_the_embed_columns(sample_trades):
+    """The embed is a JS array literal, which is also valid JSON."""
+    parsed = json.loads(build_embed(sample_trades))
+    assert len(parsed) == len(sample_trades)
+    assert all(list(row) == EMBED_COLUMNS for row in parsed)
 
 
-def test_embed_has_one_line_per_trade_plus_header(sample_trades):
-    assert len(build_embed(sample_trades).splitlines()) == len(sample_trades) + 1
+def test_embed_writes_every_value_as_a_string(sample_trades):
+    assert json.loads(build_embed(sample_trades))[0] == {
+        'date': '2026-02-05', 'trade_no': '1', 'direction': 'Short', 'result': 'Win', 'r': '1.72',
+        'violations': '0', 'type': 'Breakout', 'grade': 'B+', 'exec_grade': 'A',
+        'mins_in_trade': '65', 'mins_in_drawdown': '20'}
+    assert json.loads(build_embed(sample_trades))[1]['mins_in_trade'] == ''   # blank stays blank, not 0
 
 
-def test_embed_writes_field_values_in_column_order(sample_trades):
-    first_data_line = build_embed(sample_trades).splitlines()[1]
-    assert first_data_line == '2026-02-05,1,Short,Win,1.72,0,Breakout,B+,A,65,20'
+def test_embed_keeps_commas_quotes_and_newlines_inside_a_field(sample_trades):
+    """A comma in a CSV embed would shift every later column without an error."""
+    note = 'trailed stop, took half off "early"\\ `then` ${x}\nnext line'
+    sample_trades[0]['type'] = note
+    row = json.loads(build_embed(sample_trades))[0]
+    assert row['type'] == note
+    assert row['r'] == '1.72'                        # the columns after it did not move
 
 
-def test_embed_round_trips_through_a_csv_reader(sample_trades):
-    """What PapaParse will see in the browser must match what we put in."""
-    parsed = list(csv.DictReader(build_embed(sample_trades).splitlines()))
-    assert len(parsed) == 2
-    assert parsed[0]['date'] == '2026-02-05'
-    assert float(parsed[1]['r']) == -1
-    assert int(parsed[1]['violations']) == 2
-    assert parsed[1]['mins_in_trade'] == ''          # blank stays blank, not 0
+def test_embed_cannot_close_the_script_tag(sample_trades):
+    sample_trades[0]['grade'] = '</script><b>'
+    embed = build_embed(sample_trades)
+    assert '<' not in embed
+    assert json.loads(embed)[0]['grade'] == '</script><b>'
+
+
+@pytest.mark.parametrize('blank', [None, ''])
+def test_embed_writes_a_blank_cell_as_an_empty_string_not_null(sample_trades, blank):
+    """A blank workbook cell is None; it must embed as '' (as journal.csv has it), not null or 'None'."""
+    sample_trades[0]['type'] = blank
+    assert json.loads(build_embed(sample_trades))[0]['type'] == ''
+
+
+def test_embed_keeps_non_ascii_and_writes_it_as_ascii_escapes(sample_trades):
+    sample_trades[0]['type'] = 'Range-Bound — été →'
+    embed = build_embed(sample_trades)
+    assert embed.isascii()          # json.dumps ensure_ascii default: \uXXXX escapes
+    assert json.loads(embed)[0]['type'] == 'Range-Bound — été →'
 
 
 # ==========================================================================
-# replace_embed - 5 tests
+# replace_embed - 4 tests
 # ==========================================================================
 
+OLD = build_embed([{c: 'old' for c in EMBED_COLUMNS}])
+NEW = build_embed([{c: 'new' for c in EMBED_COLUMNS}])
 HTML = ('<html><script>\n'
-        'const MY_JOURNAL = `date,r\n2026-01-01,1`;\n'
+        f'const MY_JOURNAL = {OLD};\n'
         'function analyse(){}\n</script></html>')
 
 
 def test_replace_embed_inserts_the_new_data():
-    out = replace_embed(HTML, 'date,r\n2026-09-09,5')
-    assert '2026-09-09,5' in out
-    assert '2026-01-01,1' not in out
+    out = replace_embed(HTML, NEW)
+    assert NEW in out
+    assert OLD not in out
 
 
 def test_replace_embed_leaves_surrounding_html_untouched():
-    out = replace_embed(HTML, 'date,r\n2026-09-09,5')
+    out = replace_embed(HTML, NEW)
     assert out.startswith('<html><script>')
     assert 'function analyse(){}' in out
     assert out.count('const MY_JOURNAL') == 1
 
 
+@pytest.mark.parametrize('value', ['];', 'stop moved ]; then out'])
+def test_a_field_holding_the_terminator_does_not_end_the_block(sample_trades, value):
+    """EMBED_PATTERN ends at a line that is only '];'; no field value can produce one."""
+    sample_trades[0]['type'] = value
+    embed = build_embed(sample_trades)
+    once = replace_embed(HTML, embed)
+    assert EMBED_PATTERN.findall(once) == ['const MY_JOURNAL = ' + embed + ';']
+    assert replace_embed(once, NEW) == HTML.replace(OLD, NEW)     # the whole block goes, nothing left over
+
+
 def test_replace_embed_raises_when_anchor_is_missing():
     with pytest.raises(PipelineError, match='found 0'):
-        replace_embed('<html>no anchor here</html>', 'date,r\n2026-09-09,5')
+        replace_embed('<html>no anchor here</html>', NEW)
 
 
 def test_replace_embed_raises_when_anchor_is_duplicated():
     with pytest.raises(PipelineError, match='found 2'):
-        replace_embed(HTML + HTML, 'date,r\n2026-09-09,5')
-
-
-def test_replace_embed_rejects_a_backtick_in_the_data():
-    """A backtick would terminate the JS template literal and break the page."""
-    with pytest.raises(PipelineError, match='backtick'):
-        replace_embed(HTML, 'date,r\n2026-09-09,`evil`')
+        replace_embed(HTML + HTML, NEW)
 
 
 # ==========================================================================
@@ -354,6 +380,22 @@ def test_db_only_builds_the_database_from_journal_csv_alone(tmp_path):
     con.close()
 
 
+def test_running_update_data_twice_writes_byte_identical_files(tmp_path):
+    shutil.copy(REPO_ROOT / 'update_data.py', tmp_path)
+    shutil.copy(REPO_ROOT / 'dashboard.html', tmp_path)
+    make_workbook(tmp_path / 'b.xlsx', [
+        trade_row(ttype='trailed stop, took half off "early" ];'),
+        trade_row(date=datetime.datetime(2026, 2, 6), no=2, result='Loss', r=-1, ttype=None)])
+    # The summary line prints '→', which a cp1252 pipe on Windows cannot encode.
+    env = {**os.environ, 'PYTHONIOENCODING': 'utf-8'}
+    runs = []
+    for _ in range(2):
+        subprocess.run([sys.executable, 'update_data.py', 'b.xlsx'], cwd=tmp_path, env=env,
+                       capture_output=True, check=True)
+        runs.append([(tmp_path / f).read_bytes() for f in ('dashboard.html', 'journal.csv')])
+    assert runs[0] == runs[1]
+
+
 # ==========================================================================
 # regression guards - 3 tests
 # ==========================================================================
@@ -381,9 +423,9 @@ def test_dashboard_embed_matches_committed_journal_csv():
     reader = csv.DictReader(open(REPO_ROOT / 'journal.csv', newline=''))
     missing = [c for c in EMBED_COLUMNS if c not in reader.fieldnames]
     assert not missing, f"journal.csv has no {', '.join(missing)} column(s). " + RERUN
-    expected = build_embed(list(reader))
+    expected = 'const MY_JOURNAL = ' + build_embed(list(reader)) + ';'
     html = (REPO_ROOT / 'dashboard.html').read_text(encoding='utf-8')
-    blocks = re.findall(r'const MY_JOURNAL = `([^`]*)`;', html)
+    blocks = EMBED_PATTERN.findall(html)
     assert len(blocks) == 1, f"expected 1 MY_JOURNAL block in dashboard.html, found {len(blocks)}"
     assert blocks[0] == expected, "dashboard.html's embedded data does not match journal.csv. " + RERUN
 
