@@ -31,10 +31,9 @@ By trade type:
 ## What the numbers say
 
 The losses didn't come from the strategy. Trades where I followed my rules were
-profitable on their own. The damage came from the 30 trades where I broke a rule,
-and from volume in setups I had already graded as mediocre: only 6 of 81 trades
-were A-grade, and A was the only grade with positive expectancy. Nearly all of the
-net loss sits in range-bound trades; breakouts roughly broke even.
+profitable on their own. The damage came from the 42 trades where I broke a rule,
+and from volume in setups I had already graded as mediocre: only 11 of 101 trades
+were A-grade, and A was the only grade with positive expectancy. The whole net loss comes from range-bound trades (-6.5R); breakouts made a small profit (+2.5R over 58 trades).
 
 Extraction also caught a mistyped date in the workbook (a trade entered as May
 that belonged to April). Before the fix it inflated the losing-streak stat from 7
