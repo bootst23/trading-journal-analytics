@@ -10,7 +10,6 @@ Design notes:
 import csv
 import datetime
 import json
-import os
 import shutil
 import sqlite3
 import subprocess
@@ -23,7 +22,7 @@ import pytest
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from update_data import (  # noqa: E402
-    PipelineError, build_embed, replace_embed, summarise,
+    PipelineError, build_embed, replace_embed, summarise, summary_text,
     extract, write_csv, load_database, parse_duration, FIELDNAMES, EMBED_COLUMNS, EMBED_PATTERN,
 )
 
@@ -386,14 +385,36 @@ def test_running_update_data_twice_writes_byte_identical_files(tmp_path):
     make_workbook(tmp_path / 'b.xlsx', [
         trade_row(ttype='trailed stop, took half off "early" ];'),
         trade_row(date=datetime.datetime(2026, 2, 6), no=2, result='Loss', r=-1, ttype=None)])
-    # The summary line prints '→', which a cp1252 pipe on Windows cannot encode.
-    env = {**os.environ, 'PYTHONIOENCODING': 'utf-8'}
     runs = []
     for _ in range(2):
-        subprocess.run([sys.executable, 'update_data.py', 'b.xlsx'], cwd=tmp_path, env=env,
+        subprocess.run([sys.executable, 'update_data.py', 'b.xlsx'], cwd=tmp_path,
                        capture_output=True, check=True)
         runs.append([(tmp_path / f).read_bytes() for f in ('dashboard.html', 'journal.csv')])
     assert runs[0] == runs[1]
+
+
+def test_update_data_changes_only_the_embed_block_of_dashboard_html(tmp_path):
+    # The CRLF half of this only fails on Windows, where a text-mode write turns '\n' into
+    # '\r\n'; a green Linux CI run does not mean it is unguarded.
+    shutil.copy(REPO_ROOT / 'update_data.py', tmp_path)
+    shutil.copy(REPO_ROOT / 'dashboard.html', tmp_path)
+    make_workbook(tmp_path / 'b.xlsx', [trade_row()])
+    before = (tmp_path / 'dashboard.html').read_bytes()
+    subprocess.run([sys.executable, 'update_data.py', 'b.xlsx'], cwd=tmp_path,
+                   capture_output=True, check=True)
+    after = (tmp_path / 'dashboard.html').read_bytes()
+    # latin-1 maps each byte to one character, so slicing the str is slicing the bytes.
+    old, new = (EMBED_PATTERN.search(b.decode('latin-1')) for b in (before, after))
+    assert new, "no LF-delimited MY_JOURNAL block after the rewrite"
+    assert before[:old.start()] == after[:new.start()]
+    assert before[old.end():] == after[new.end():]
+
+
+def test_summary_text_is_ascii():
+    """A cp1252 console cannot print non-ASCII, and the crash came after the files were written."""
+    trades = [{'date': '2026-02-05', 'r': 1, 'result': 'Win'},
+              {'date': '2026-02-06', 'r': -1, 'result': 'Loss'}]
+    assert summary_text(summarise(trades)).isascii()
 
 
 # ==========================================================================

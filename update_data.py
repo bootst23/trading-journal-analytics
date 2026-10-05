@@ -133,6 +133,13 @@ def summarise(trades):
     }
 
 
+def summary_text(s):
+    """The run summary main() prints. ASCII only: a cp1252 console cannot encode more."""
+    return (f"Embedded {s['trades']} trades into dashboard.html\n"
+            f"  net: {s['net_r']:+.2f}R | win rate (excl BE): {s['win_rate']:.1f}% "
+            f"| span: {s['first_date']} -> {s['last_date']}")
+
+
 # --------------------------------------------------------------------------
 # I/O functions
 # --------------------------------------------------------------------------
@@ -246,17 +253,18 @@ def main(argv=None):
         if not trades:
             raise PipelineError("No valid trades found in the Master sheet.")
         write_csv(trades, here / 'journal.csv')
-        dash.write_text(replace_embed(dash.read_text(), build_embed(trades)))
+        # Explicit, not the locale default (cp1252 on Windows, which cannot decode some UTF-8
+        # bytes). The read keeps universal newlines, which EMBED_PATTERN relies on;
+        # read_text only takes newline= from Python 3.13.
+        html = dash.read_text(encoding='utf-8')
+        dash.write_text(replace_embed(html, build_embed(trades)), encoding='utf-8', newline='\n')
         if want_db:
             n = load_database(here / 'journal.csv', here / 'journal.db')
             print(f"Loaded {n} trades into journal.db")
     except PipelineError as e:
         sys.exit(f"Pipeline aborted: {e}")
 
-    s = summarise(trades)
-    print(f"Embedded {s['trades']} trades into dashboard.html")
-    print(f"  net: {s['net_r']:+.2f}R | win rate (excl BE): {s['win_rate']:.1f}% "
-          f"| span: {s['first_date']} → {s['last_date']}")
+    print(summary_text(summarise(trades)))
     if warnings:
         print("\nData-quality warnings (fix these in the workbook if wrong):")
         print('\n'.join(warnings))
