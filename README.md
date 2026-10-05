@@ -2,7 +2,7 @@
 
 SQL and dashboard analysis of my own trading journal. 101 crypto futures trades
 (BTC/ETH/SOL), Feb-Oct 2026, logged in Excel with direction, result, R-multiple,
-a setup grade (A+ to D) assigned before entry, five rule-violation flags, and
+a setup grade (A+ to D) assigned before entry, eight rule-violation flags, and
 trade type.
 
 ## Stats
