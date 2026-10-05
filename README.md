@@ -1,32 +1,32 @@
 ﻿# Trading Journal Analytics
 
-SQL and dashboard analysis of my own trading journal. 81 crypto futures trades
-(BTC/ETH/SOL), Feb-Jun 2026, logged in Excel with direction, result, R-multiple,
+SQL and dashboard analysis of my own trading journal. 101 crypto futures trades
+(BTC/ETH/SOL), Feb-Oct 2026, logged in Excel with direction, result, R-multiple,
 a setup grade (A+ to D) assigned before entry, five rule-violation flags, and
 trade type.
 
 ## Stats
 
 Overall:
-- 81 trades, net -6.7R
-- Win rate 28.0% (excl. break-even)
-- Avg win +2.06R, avg loss -0.92R (payoff 2.2)
-- Expectancy -0.08R per trade
-- Max drawdown -18.5R, longest losing streak 7
+- 101 trades, net -4.1R
+- Win rate 31.5% (excl. break-even)
+- Avg win +1.88R, avg loss -0.93R (payoff 2.0)
+- Expectancy -0.04R per trade
+- Max drawdown -20.2R, longest losing streak 7
 
 By rule compliance:
-- 0 violations, 51 trades: +17.1R total, +0.34R per trade
-- 1+ violations, 30 trades: -23.8R total, -0.79R per trade
+- 0 violations, 59 trades: +24.8R total, +0.42R per trade
+- 1+ violations, 42 trades: -28.9R total, -0.69R per trade
 
 By setup grade (assigned at entry, before the outcome was known):
-- A, 6 trades: +8.6R, +1.44R per trade, 67% win rate
-- B, 44 trades: -8.8R, -0.20R per trade, 28%
-- C, 26 trades: -2.0R, -0.08R per trade, 24%
-- D, 5 trades: -4.5R, -0.90R per trade, 0%
+- A, 11 trades: +13.0R, +1.18R per trade, 70% win rate
+- B, 50 trades: -6.9R, -0.14R per trade, 32%
+- C, 34 trades: -4.6R, -0.14R per trade, 25%
+- D, 6 trades: -5.5R, -0.92R per trade, 0%
 
 By trade type:
-- Breakout, 51 trades: +0.03R total
-- Range-bound, 30 trades: -6.7R total
+- Breakout, 58 trades: +2.5R total
+- Range-bound, 43 trades: -6.5R total
 
 ## What the numbers say
 

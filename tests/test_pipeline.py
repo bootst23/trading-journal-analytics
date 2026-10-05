@@ -363,13 +363,13 @@ def test_committed_journal_reproduces_the_published_headline_figures():
     rows = list(csv.DictReader(open(REPO_ROOT / 'journal.csv')))
     trades = [{**r, 'r': float(r['r'])} for r in rows]
     s = summarise(trades)
-    assert s['trades'] == 81
-    assert s['net_r'] == -6.67
-    assert s['win_rate'] == 28.0
+    assert s['trades'] == 101
+    assert s['net_r'] == -4.05
+    assert s['win_rate'] == 31.5
     clean = [t for t in trades if int(t['violations']) == 0]
     viol = [t for t in trades if int(t['violations']) > 0]
-    assert (len(clean), round(sum(t['r'] for t in clean), 1)) == (51, 17.1)
-    assert (len(viol), round(sum(t['r'] for t in viol), 1)) == (30, -23.8)
+    assert (len(clean), round(sum(t['r'] for t in clean), 1)) == (59, 24.8)
+    assert (len(viol), round(sum(t['r'] for t in viol), 1)) == (42, -28.9)
 
 
 RERUN = ("Rerun `python update_data.py <workbook>` to regenerate both; "
