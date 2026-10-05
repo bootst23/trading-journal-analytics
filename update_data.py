@@ -25,10 +25,7 @@ import sys, re, csv, sqlite3, datetime
 from pathlib import Path
 from decimal import Decimal, ROUND_HALF_UP
 
-try:
-    import openpyxl
-except ImportError:
-    sys.exit("openpyxl is required:  pip install openpyxl")
+import openpyxl
 
 MONTHS = {'january':1,'february':2,'march':3,'april':4,'may':5,'june':6,
           'july':7,'august':8,'september':9,'october':10,'november':11,'december':12}
@@ -204,9 +201,7 @@ def load_database(csv_path, db_path):
     like `WHERE r < 0`. Blank cells, and columns an older CSV does not have,
     are stored as NULL so AVG() skips them instead of counting them as 0.
     """
-    db_path = Path(db_path)
-    if db_path.exists():
-        db_path.unlink()
+    Path(db_path).unlink(missing_ok=True)
     con = sqlite3.connect(db_path)
     try:
         con.execute(SCHEMA)

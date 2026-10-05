@@ -1,4 +1,4 @@
-"""analysis.sql must agree with the README's Definitions section.
+﻿"""analysis.sql must agree with the README's Definitions section.
 
 Each test runs one query from analysis.sql against a database built from the
 committed journal.csv, and recomputes the same figure in plain Python straight
@@ -35,11 +35,6 @@ SETUP = _blocks[0]
 QUERIES = {int(re.match(r'-- (\d+)\. ', b).group(1)): b for b in _blocks[1:]}
 
 
-def sql_query(number):
-    """Return the text of query `number` (the block under '-- N. ...')."""
-    return QUERIES[number]
-
-
 def build_db(csv_path, db_path):
     """Load the trades table from a CSV, then create the views analysis.sql defines."""
     load_database(csv_path, db_path)
@@ -65,7 +60,7 @@ def trades():
 
 
 def test_headline_query_matches_definitions(db, trades):
-    total, wins, losses, be, win_rate, net_r, expectancy = db.execute(sql_query(1)).fetchone()
+    total, wins, losses, be, win_rate, net_r, expectancy = db.execute(QUERIES[1]).fetchone()
     n_win = sum(t['result'] == 'Win' for t in trades)
     n_loss = sum(t['result'] == 'Loss' for t in trades)
     net = sum(t['r'] for t in trades)
@@ -78,7 +73,7 @@ def test_headline_query_matches_definitions(db, trades):
 
 
 def test_compliance_query_matches_definitions(db, trades):
-    rows = {label: (n, net_r, exp) for label, n, net_r, exp in db.execute(sql_query(3))}
+    rows = {label: (n, net_r, exp) for label, n, net_r, exp in db.execute(QUERIES[3])}
     groups = {'rule-compliant': [t for t in trades if t['violations'] == 0],
               'violated rules': [t for t in trades if t['violations'] > 0]}
 
@@ -98,7 +93,7 @@ def test_max_drawdown_query_matches_definition(db, trades):
         peak = max(peak, cum)
         worst = min(worst, cum - peak)
 
-    assert db.execute(sql_query(8)).fetchone()[0] == half_up(worst, 2)
+    assert db.execute(QUERIES[8]).fetchone()[0] == half_up(worst, 2)
 
 
 def python_equity_curve(trades):
@@ -143,7 +138,7 @@ def test_max_drawdown_counts_early_and_same_day_losses(tmp_path):
               {'date': '2026-01-06', 'trade_no': 3, 'result': 'Win', 'r': 3}]
     con = build_db(write_csv(trades, tmp_path / 'journal.csv'), tmp_path / 'journal.db')
 
-    assert con.execute(sql_query(8)).fetchone()[0] == -2.0
+    assert con.execute(QUERIES[8]).fetchone()[0] == -2.0
     con.close()
 
 
@@ -153,7 +148,7 @@ def test_losing_streak_query_matches_definition(db, trades):
         streak = streak + 1 if t['result'] == 'Loss' else 0   # a win or BE ends it
         longest = max(longest, streak)
 
-    assert db.execute(sql_query(9)).fetchone()[0] == longest
+    assert db.execute(QUERIES[9]).fetchone()[0] == longest
 
 
 @pytest.mark.parametrize('number', [5, 10])
@@ -163,5 +158,5 @@ def test_monthly_queries_group_by_the_month_of_the_date(db, trades, number):
     for t in trades:
         expected[t['date'][:7]] = expected.get(t['date'][:7], 0) + 1
 
-    got = [(month, n) for month, n, *_ in db.execute(sql_query(number))]
+    got = [(month, n) for month, n, *_ in db.execute(QUERIES[number])]
     assert got == sorted(expected.items())

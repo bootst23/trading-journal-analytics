@@ -340,6 +340,9 @@ function analyse(rows) {
   maxDD /= 1e6;
   const clean = rows.filter(r => r.violations === 0), vio = rows.filter(r => r.violations > 0);
   const exp = a => a.length ? sumR(a) / a.length : 0;
+  // Win rate excludes break-even; null when nothing was decided.
+  const wr = a => { const w = a.filter(r => r.result === 'Win').length, l = a.filter(r => r.result === 'Loss').length;
+    return w + l ? 100 * w / (w + l) : null; };
 
   let streak = 0, worst = 0;
   rows.forEach(r => { streak = r.result === 'Loss' ? streak + 1 : 0; worst = Math.max(worst, streak); });
@@ -362,7 +365,7 @@ function analyse(rows) {
   document.getElementById('stat-clean').textContent = 'rule-compliant only · ' + fR(sumR(clean));
 
   const kpis = [
-    ['Win rate (excl BE)', (100 * wins.length / (wins.length + losses.length)).toFixed(1) + '%', ''],
+    ['Win rate (excl BE)', (wr(rows) ?? 0).toFixed(1) + '%', ''],
     ['Expectancy / trade', fR(netR / rows.length), netR >= 0 ? 'pos' : 'neg'],
     ['Avg win / avg loss', (exp(wins) / Math.abs(exp(losses))).toFixed(2), ''],
     ['Max drawdown', fR(maxDD), 'neg'],
@@ -426,8 +429,7 @@ function analyse(rows) {
   });
 
   /* grade */
-  const gd = {};
-  rows.forEach(r => { (gd[gradeBucket(r.grade)] = gd[gradeBucket(r.grade)] || []).push(r); });
+  const gd = Object.groupBy(rows, r => gradeBucket(r.grade));
   const gKeys = ['A', 'B', 'C', 'D'].filter(k => gd[k]);
   new Chart(document.getElementById('grade'), {
     type: 'bar',
@@ -466,15 +468,10 @@ function analyse(rows) {
   });
 
   /* type: breakout vs range-bound */
-  const ty = {};
-  rows.forEach(r => { const k = r.type || 'Unlabelled'; (ty[k] = ty[k] || []).push(r); });
+  const ty = Object.groupBy(rows, r => r.type || 'Unlabelled');
   const tKeys = Object.keys(ty).sort((a, b) => exp(ty[b]) - exp(ty[a]));
   const tNet = k => sumR(ty[k]);
-  const tWr = k => {
-    const w = ty[k].filter(r => r.result === 'Win').length,
-          l = ty[k].filter(r => r.result === 'Loss').length;
-    return (w + l) ? 100 * w / (w + l) : 0;
-  };
+  const tWr = k => wr(ty[k]) ?? 0;
   new Chart(document.getElementById('typechart'), {
     type: 'bar',
     data: { labels: tKeys.map(k => k + ' (' + ty[k].length + ')'),
@@ -512,16 +509,15 @@ function analyse(rows) {
       `<tr><td class="l">${label}</td><td>${avgMins(wins, k)}</td><td>${avgMins(losses, k)}</td></tr>`).join('');
 
   /* execution grade: only trades that have one, grouped by letter */
-  const graded = rows.filter(r => r.exec_grade), eg = {};
-  graded.forEach(r => { const k = gradeBucket(r.exec_grade); (eg[k] = eg[k] || []).push(r); });
+  const graded = rows.filter(r => r.exec_grade), eg = Object.groupBy(graded, r => gradeBucket(r.exec_grade));
   document.getElementById('execsub').textContent = 'win rate (excl. break-even) and average R · ' +
     graded.length + ' graded trade' + (graded.length === 1 ? '' : 's');
   document.getElementById('exectable').innerHTML =
     '<tr><th class="l">Grade</th><th>Trades</th><th>Win rate</th><th>Avg R</th></tr>' +
     (graded.length ? Object.keys(eg).sort().map(k => {
-      const g = eg[k], w = g.filter(r => r.result === 'Win').length, l = g.filter(r => r.result === 'Loss').length;
+      const g = eg[k], p = wr(g);
       return `<tr><td class="l">${k}</td><td>${g.length}</td>
-        <td>${w + l ? (100 * w / (w + l)).toFixed(1) + '%' : 'n/a'}</td><td>${fR(exp(g))}</td></tr>`;
+        <td>${p === null ? 'n/a' : p.toFixed(1) + '%'}</td><td>${fR(exp(g))}</td></tr>`;
     }).join('') : '<tr><td class="l" colspan="4">no graded trades yet</td></tr>');
 
   /* table */
