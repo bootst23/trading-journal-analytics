@@ -301,7 +301,7 @@ const gradeBucket = g => { g = String(g || '?'); return 'ABCD'.includes(g[0]) ? 
 function analyse(rows) {
   const num = v => (v == null || String(v).trim() === '') ? null : Number(v);   // blank = missing, not 0
   rows = rows.filter(r => r.date && r.result && !isNaN(parseFloat(r.r)))
-             .map(r => ({ ...r, r: parseFloat(r.r), ru: Math.round(parseFloat(r.r) * 10000),
+             .map(r => ({ ...r, r: parseFloat(r.r), ru: Math.round(parseFloat(r.r) * 1e6),
                            violations: parseInt(r.violations) || 0,
                            exec_grade: String(r.exec_grade || '').trim(),
                            mins_in_trade: num(r.mins_in_trade), mins_in_drawdown: num(r.mins_in_drawdown) }))
@@ -311,13 +311,13 @@ function analyse(rows) {
 
   const wins = rows.filter(r => r.result === 'Win'),
         losses = rows.filter(r => r.result === 'Loss');
-  // Totals add R as whole ten-thousandths (ru) and divide once: float sums drift off exact halves.
-  const sumR = a => a.reduce((s, r) => s + r.ru, 0) / 10000;
+  // Totals add R as whole millionths (ru; R can have up to 5 decimals) and divide once: float sums drift off exact halves.
+  const sumR = a => a.reduce((s, r) => s + r.ru, 0) / 1e6;
   const netR = sumR(rows);
   let cum = 0, peak = 0, maxDD = 0;
   const eq = rows.map(r => { cum += r.ru; peak = Math.max(peak, cum); maxDD = Math.min(maxDD, cum - peak);
-    return { d: r.date, v: cum / 10000, dd: (cum - peak) / 10000 }; });
-  maxDD /= 10000;
+    return { d: r.date, v: cum / 1e6, dd: (cum - peak) / 1e6 }; });
+  maxDD /= 1e6;
   const clean = rows.filter(r => r.violations === 0), vio = rows.filter(r => r.violations > 0);
   const exp = a => a.length ? sumR(a) / a.length : 0;
 
@@ -359,7 +359,7 @@ function analyse(rows) {
   const moKeys = Object.keys(mo).sort();
   new Chart(document.getElementById('heromonthly'), {
     type: 'bar',
-    data: { labels: moKeys.map(m => m.slice(5)), datasets: [{ data: moKeys.map(m => mo[m] / 10000),
+    data: { labels: moKeys.map(m => m.slice(5)), datasets: [{ data: moKeys.map(m => mo[m] / 1e6),
       backgroundColor: moKeys.map(m => mo[m] >= 0 ? C.ink : 'rgba(24,24,27,.25)'),
       borderRadius: 6, maxBarThickness: 26 }] },
     options: { maintainAspectRatio: false,

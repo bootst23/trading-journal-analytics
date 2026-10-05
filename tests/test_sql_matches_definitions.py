@@ -101,19 +101,39 @@ def test_max_drawdown_query_matches_definition(db, trades):
     assert db.execute(sql_query(8)).fetchone()[0] == half_up(worst, 2)
 
 
-def test_equity_curve_view_matches_python_row_by_row(db, trades):
-    cum = peak = Decimal(0)                  # balance and peak both start at 0R
-    expected = []
+def python_equity_curve(trades):
+    """(date, trade_no, cum, peak, drawdown) per trade, exact in Decimal; both start at 0R."""
+    cum = peak = Decimal(0)
+    rows = []
     for t in trades:
-        cum += t['r']
+        cum += Decimal(str(t['r']))
         peak = max(peak, cum)
-        expected.append((t['date'], int(t['trade_no']),
-                         half_up(cum, 4), half_up(peak, 4), half_up(cum - peak, 4)))
-    # R has at most 4 decimals, so 4 places is exact; it only strips float-sum noise
-    got = db.execute("SELECT date, trade_no, ROUND(cum_r, 4), ROUND(peak_r, 4), "
-                     "ROUND(drawdown_r, 4) FROM equity_curve ORDER BY date, trade_no").fetchall()
+        rows.append((t['date'], int(t['trade_no']), float(cum), float(peak), float(cum - peak)))
+    return rows
 
-    assert got == expected
+
+def assert_equity_curve_matches(con, trades):
+    # R can have 5+ decimals, so compare within float-sum noise rather than rounding to fixed places
+    got = con.execute("SELECT date, trade_no, cum_r, peak_r, drawdown_r "
+                      "FROM equity_curve ORDER BY date, trade_no").fetchall()
+    expected = python_equity_curve(trades)
+    assert [g[:2] for g in got] == [e[:2] for e in expected]
+    for g, e in zip(got, expected):
+        assert g[2:] == pytest.approx(e[2:], abs=1e-9), g[:2]
+
+
+def test_equity_curve_view_matches_python_row_by_row(db, trades):
+    assert_equity_curve_matches(db, trades)
+
+
+def test_equity_curve_view_handles_five_decimal_r(tmp_path):
+    """R of 2.06975 (as on 1 Sep 2026) and -1: SQL view and plain Python agree row by row."""
+    trades = [{'date': '2026-09-01', 'trade_no': 1, 'result': 'Win', 'r': 2.06975},
+              {'date': '2026-09-02', 'trade_no': 2, 'result': 'Loss', 'r': -1}]
+    con = build_db(write_csv(trades, tmp_path / 'journal.csv'), tmp_path / 'journal.db')
+
+    assert_equity_curve_matches(con, trades)
+    con.close()
 
 
 def test_max_drawdown_counts_early_and_same_day_losses(tmp_path):
