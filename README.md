@@ -66,6 +66,22 @@ trade's result as a multiple of the amount risked.
 - **Rounding**: figures are rounded half away from zero, so -6.665 shows as -6.67,
   the same in Python, SQL and the dashboard.
 
+## Known limitations
+
+- **Needs the internet to draw charts.** Chart.js loads from a CDN, so the
+  dashboard opens offline but the charts stay blank.
+- **Needs a browser from late 2023 or newer** (Chrome 117+, Safari 17.4+,
+  Firefox 119+), because the dashboard uses `Object.groupBy`.
+- **Same-day order is by trade number, not clock time.** Trade numbers restart
+  for longs and shorts each month, so on days with both a long and a short
+  (five days so far), the order may not match when I took them. Logging entry
+  times would fix this.
+- **V6 to V8 only exist from September 2026.** Earlier months can only show
+  V1 to V5, so per-rule comparisons across the whole journal are uneven.
+- **The JavaScript calculations are not covered by automated tests.** Python
+  and SQL are tested against the Definitions; the dashboard follows the same
+  definitions and was checked by hand.
+  
 ## Files
 
 | File | What it does |
