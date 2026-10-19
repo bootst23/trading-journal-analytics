@@ -7,8 +7,6 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <style>
   :root {
     --bg: #f6f5f1; --hero: #eceee3; --card: #ffffff;
@@ -29,8 +27,6 @@
     transition: margin-left .25s ease; }
   body.nav-hidden aside { margin-left: -232px; }
   .brand { font-weight: 700; font-size: 17px; letter-spacing: -.02em; padding: 2px 10px 20px; }
-  .navlabel { font-size: 11px; color: var(--muted); text-transform: uppercase;
-    letter-spacing: .06em; padding: 16px 10px 6px; }
   aside a { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 9px;
     color: var(--ink); text-decoration: none; font-weight: 500; font-size: 13.5px; }
   aside a:hover { background: #ecebe5; }
@@ -50,14 +46,6 @@
   .icon-btn:hover { background: #f1f0ea; }
   .icon-btn svg { width: 16px; height: 16px; stroke: var(--ink); fill: none; stroke-width: 2; }
   .topbar .range { color: var(--muted); font-size: 13px; }
-  .topbar .spacer { flex: 1; }
-  .btn-dark { background: var(--ink); color: #fff; border: none; border-radius: 11px;
-    padding: 10px 18px; font-weight: 600; font-size: 13.5px; cursor: pointer;
-    display: inline-flex; align-items: center; gap: 8px; box-shadow: var(--shadow); }
-  .btn-dark:hover { opacity: .88; }
-  .btn-dark svg { width: 15px; height: 15px; stroke: #fff; fill: none; stroke-width: 2.2; }
-  .fname { font-size: 12px; color: var(--muted); }
-  input[type=file] { position: absolute; width: 1px; height: 1px; opacity: 0; }
 
   /* ---------- hero band ---------- */
   .hero { background: var(--hero); border-radius: 18px; padding: 26px clamp(18px, 3vw, 34px);
@@ -114,6 +102,7 @@
   .pill.loss { background: #fbe9e4; color: var(--loss); }
   .pill.be { background: #ececec; color: var(--muted); }
   .table-wrap { overflow: auto; max-height: 430px; }
+  td .n { color: var(--muted); font-size: 11px; }
   footer { color: var(--muted); font-size: 12px; line-height: 1.7; margin-top: 22px; }
 </style>
 </head>
@@ -125,9 +114,7 @@
   <a href="#equity"><svg viewBox="0 0 24 24"><path d="M3 17l6-6 4 4 7-8M21 7v5h-5"/></svg>Equity</a>
   <a href="#discipline"><svg viewBox="0 0 24 24"><path d="M12 3l7 4v5c0 5-3.5 8-7 9-3.5-1-7-4-7-9V7z"/></svg>Discipline</a>
   <a href="#log"><svg viewBox="0 0 24 24"><path d="M4 5h16M4 12h16M4 19h10"/></svg>Trade log</a>
-  <div class="navlabel">Data</div>
-  <a href="#" id="reload"><svg viewBox="0 0 24 24"><path d="M4 4v6h6M20 20v-6h-6M5.5 9A8 8 0 0119 7.5M18.5 15A8 8 0 015 16.5"/></svg>Reset to my journal</a>
-  <div class="foot">Nathan Yap · Feb-Jun 2026<br>81 trades · crypto derivatives</div>
+  <div class="foot" id="foot">Nathan Yap</div>
 </aside>
 
 <main id="top">
@@ -138,10 +125,6 @@
       <div style="font-weight:700; font-size:16px; letter-spacing:-.01em">Performance overview</div>
       <div class="range mono" id="range">-</div>
     </div>
-    <div class="spacer"></div>
-    <span class="fname" id="fname">my journal · embedded</span>
-    <label class="btn-dark"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
-      Load journal<input type="file" id="csv" accept=".csv,.xlsx,.xls"></label>
   </div>
 
   <section class="hero">
@@ -195,6 +178,15 @@
       <canvas id="typewin"></canvas></div>
   </div>
 
+  <div class="grid2">
+    <div class="card"><h2>Time in trade</h2>
+      <div class="sub">average per trade, winners vs losers · break-even excluded · (trades with a time)</div>
+      <table id="timetable"></table></div>
+    <div class="card"><h2>Execution grade</h2>
+      <div class="sub" id="execsub">-</div>
+      <table id="exectable"></table></div>
+  </div>
+
   <div class="card">
     <a id="log"></a><h2>Trade log</h2>
     <div class="sub">most recent first</div>
@@ -203,94 +195,114 @@
 
   <footer>
     Single-file dashboard · analytics reproduced in SQL (analysis.sql) ·
-    accepts the original journal workbook (Master sheet) or CSV with columns:
-    date, direction, result (Win/Loss/BE), r, violations, type, grade.
+    data embedded by update_data.py.
   </footer>
 </main>
 
 <script>
-const MY_JOURNAL = `date,direction,result,r,violations,type,grade
-2026-02-05,Short,Win,1.72,0,Breakout,B+
-2026-02-06,Long,Win,2.83,0,Breakout,A-
-2026-02-08,Long,Win,0.735,1,Breakout,B-
-2026-02-09,Short,Loss,-0.5,1,Breakout,B
-2026-02-10,Short,Loss,-1,0,Breakout,B
-2026-02-11,Short,Loss,-0.5,1,Breakout,C+
-2026-02-12,Short,Loss,-1,1,Breakout,B-
-2026-02-12,Short,Loss,-1,0,Breakout,A-
-2026-02-15,Short,BE,0,0,Breakout,B+
-2026-02-17,Short,Loss,-0.5,3,Breakout,C
-2026-02-18,Short,Loss,-1,4,Breakout,D
-2026-02-18,Short,Loss,-1,1,Breakout,D
-2026-02-19,Long,Loss,-1,1,Breakout,C+
-2026-02-19,Long,Loss,-1,0,Range-Bound,C
-2026-02-20,Long,BE,0,1,Range-Bound,C
-2026-02-20,Long,Loss,-1,1,Breakout,C+
-2026-02-24,Short,Win,1.49,0,Breakout,C+
-2026-02-26,Short,Win,4.91,0,Range-Bound,C
-2026-02-27,Short,Win,0.725,0,Range-Bound,C
-2026-03-01,Long,Loss,-0.5,0,Breakout,C
-2026-03-03,Long,Win,2.89,0,Breakout,B+
-2026-03-05,Short,Loss,-1,1,Breakout,C
-2026-03-05,Short,Win,2.82,0,Breakout,B
-2026-03-08,Short,Loss,-0.5,1,Breakout,C
-2026-03-09,Short,Loss,-1,0,Range-Bound,C+
-2026-03-10,Long,Loss,-1,1,Breakout,C
-2026-03-10,Short,Win,1,0,Range-Bound,C
-2026-03-11,Long,Loss,-1,0,Breakout,B-
-2026-03-12,Long,Win,2.91,0,Breakout,C+
-2026-03-13,Short,Win,2.76,0,Range-Bound,C+
-2026-03-15,Long,Win,0.705,0,Breakout,B
-2026-03-17,Long,Loss,-1,1,Range-Bound,B-
-2026-03-18,Short,Win,1.82,0,Breakout,B-
-2026-03-18,Long,Loss,-0.5,2,Breakout,D
-2026-03-19,Long,Loss,-1,1,Range-Bound,B
-2026-03-20,Short,Loss,-2,1,Breakout,B-
-2026-03-22,Long,Loss,-0.5,0,Range-Bound,B
-2026-03-23,Short,Win,0.1975,0,Range-Bound,B
-2026-03-24,Short,Loss,-1,1,Breakout,B+
-2026-03-25,Short,BE,0,2,Range-Bound,B-
-2026-03-26,Short,Win,4.34,0,Breakout,B+
-2026-03-31,Long,BE,0,0,Breakout,B
-2026-04-01,Long,Loss,-1,1,Breakout,B
-2026-04-02,Long,Loss,-1,1,Breakout,B+
-2026-04-03,Short,Loss,-1,0,Range-Bound,B
-2026-04-07,Short,Loss,-1,0,Breakout,B
-2026-04-08,Short,Loss,-1,0,Breakout,B+
-2026-04-09,Short,Loss,-1,0,Breakout,B+
-2026-04-10,Long,Win,2.08,0,Breakout,B
-2026-04-10,Short,Loss,-1,1,Range-Bound,B
-2026-04-12,Short,Loss,-1,0,Breakout,B+
-2026-04-13,Short,Loss,-0.25,0,Range-Bound,C+
-2026-04-14,Short,Loss,-1.6875,0,Range-Bound,B+
-2026-04-15,Short,Loss,-1,0,Breakout,B
-2026-04-15,Short,Loss,-0.5,1,Breakout,B
-2026-04-16,Long,Win,0.9,0,Range-Bound,A
-2026-04-19,Long,Loss,-1,0,Breakout,A
-2026-04-19,Short,Win,1,0,Range-Bound,B
-2026-04-21,Long,Loss,-1,0,Range-Bound,B
-2026-04-21,Short,Loss,-1,0,Breakout,C
-2026-04-22,Short,BE,0,0,Range-Bound,B
-2026-04-23,Long,Loss,-1,0,Range-Bound,B
-2026-04-24,Short,Loss,-0.75,0,Range-Bound,C
-2026-04-26,Long,Win,3.1,0,Breakout,A+
-2026-04-27,Long,Loss,-1,0,Range-Bound,C
-2026-04-30,Short,Loss,-1,1,Range-Bound,C
-2026-05-03,Short,Loss,-1,1,Range-Bound,B
-2026-05-05,Long,Loss,-0.75,2,Breakout,C-
-2026-05-06,Short,Loss,-0.75,1,Breakout,B
-2026-05-10,Long,Loss,-1,0,Breakout,B
-2026-05-12,Short,Loss,-0.75,0,Breakout,B
-2026-05-27,Short,Win,0.54,0,Breakout,B+
-2026-06-03,Short,Win,3.8,0,Breakout,A-
-2026-06-05,Short,Loss,-1,0,Breakout,D
-2026-06-10,Long,Loss,-1,2,Breakout,C
-2026-06-11,Short,Loss,-1,0,Range-Bound,B
-2026-06-16,Long,Loss,-1,1,Range-Bound,C
-2026-06-17,Long,BE,0,0,Range-Bound,B
-2026-06-23,Short,Loss,-1,2,Breakout,C
-2026-06-25,Long,Loss,-1,0,Range-Bound,D
-2026-06-26,Short,Loss,-1,0,Range-Bound,B`;
+const MY_JOURNAL = [
+{"date": "2026-02-05", "trade_no": "1", "direction": "Short", "result": "Win", "r": "1.72", "violations": "0", "type": "Breakout", "grade": "B+", "exec_grade": "", "mins_in_trade": "180", "mins_in_drawdown": "15"},
+{"date": "2026-02-06", "trade_no": "1", "direction": "Long", "result": "Win", "r": "2.83", "violations": "0", "type": "Breakout", "grade": "A-", "exec_grade": "", "mins_in_trade": "165", "mins_in_drawdown": "0"},
+{"date": "2026-02-08", "trade_no": "2", "direction": "Long", "result": "Win", "r": "0.735", "violations": "1", "type": "Breakout", "grade": "B-", "exec_grade": "", "mins_in_trade": "382", "mins_in_drawdown": "71"},
+{"date": "2026-02-09", "trade_no": "2", "direction": "Short", "result": "Loss", "r": "-0.5", "violations": "1", "type": "Breakout", "grade": "B", "exec_grade": "", "mins_in_trade": "29", "mins_in_drawdown": "29"},
+{"date": "2026-02-10", "trade_no": "3", "direction": "Short", "result": "Loss", "r": "-1", "violations": "0", "type": "Breakout", "grade": "B", "exec_grade": "", "mins_in_trade": "90", "mins_in_drawdown": "60"},
+{"date": "2026-02-11", "trade_no": "4", "direction": "Short", "result": "Loss", "r": "-0.5", "violations": "1", "type": "Breakout", "grade": "C+", "exec_grade": "", "mins_in_trade": "22", "mins_in_drawdown": "21"},
+{"date": "2026-02-12", "trade_no": "5", "direction": "Short", "result": "Loss", "r": "-1", "violations": "1", "type": "Breakout", "grade": "B-", "exec_grade": "", "mins_in_trade": "120", "mins_in_drawdown": "120"},
+{"date": "2026-02-12", "trade_no": "6", "direction": "Short", "result": "Loss", "r": "-1", "violations": "0", "type": "Breakout", "grade": "A-", "exec_grade": "", "mins_in_trade": "1440", "mins_in_drawdown": "180"},
+{"date": "2026-02-15", "trade_no": "7", "direction": "Short", "result": "BE", "r": "0", "violations": "0", "type": "Breakout", "grade": "B+", "exec_grade": "", "mins_in_trade": "597", "mins_in_drawdown": "120"},
+{"date": "2026-02-17", "trade_no": "8", "direction": "Short", "result": "Loss", "r": "-0.5", "violations": "3", "type": "Breakout", "grade": "C", "exec_grade": "", "mins_in_trade": "6", "mins_in_drawdown": "6"},
+{"date": "2026-02-18", "trade_no": "9", "direction": "Short", "result": "Loss", "r": "-1", "violations": "4", "type": "Breakout", "grade": "D", "exec_grade": "", "mins_in_trade": "60", "mins_in_drawdown": "60"},
+{"date": "2026-02-18", "trade_no": "10", "direction": "Short", "result": "Loss", "r": "-1", "violations": "1", "type": "Breakout", "grade": "D", "exec_grade": "", "mins_in_trade": "66", "mins_in_drawdown": "42"},
+{"date": "2026-02-19", "trade_no": "3", "direction": "Long", "result": "Loss", "r": "-1", "violations": "1", "type": "Breakout", "grade": "C+", "exec_grade": "", "mins_in_trade": "375", "mins_in_drawdown": "340"},
+{"date": "2026-02-19", "trade_no": "4", "direction": "Long", "result": "Loss", "r": "-1", "violations": "0", "type": "Range-Bound", "grade": "C", "exec_grade": "", "mins_in_trade": "32", "mins_in_drawdown": "19"},
+{"date": "2026-02-20", "trade_no": "5", "direction": "Long", "result": "BE", "r": "0", "violations": "1", "type": "Range-Bound", "grade": "C", "exec_grade": "", "mins_in_trade": "77", "mins_in_drawdown": "38"},
+{"date": "2026-02-20", "trade_no": "6", "direction": "Long", "result": "Loss", "r": "-1", "violations": "1", "type": "Breakout", "grade": "C+", "exec_grade": "", "mins_in_trade": "77", "mins_in_drawdown": "20"},
+{"date": "2026-02-24", "trade_no": "11", "direction": "Short", "result": "Win", "r": "1.49", "violations": "0", "type": "Breakout", "grade": "C+", "exec_grade": "", "mins_in_trade": "116", "mins_in_drawdown": "10"},
+{"date": "2026-02-26", "trade_no": "12", "direction": "Short", "result": "Win", "r": "4.91", "violations": "0", "type": "Range-Bound", "grade": "C", "exec_grade": "", "mins_in_trade": "1605", "mins_in_drawdown": "340"},
+{"date": "2026-02-27", "trade_no": "13", "direction": "Short", "result": "Win", "r": "0.725", "violations": "0", "type": "Range-Bound", "grade": "C", "exec_grade": "", "mins_in_trade": "82", "mins_in_drawdown": "32"},
+{"date": "2026-03-01", "trade_no": "1", "direction": "Long", "result": "Loss", "r": "-0.5", "violations": "0", "type": "Breakout", "grade": "C", "exec_grade": "", "mins_in_trade": "1245", "mins_in_drawdown": "330"},
+{"date": "2026-03-03", "trade_no": "2", "direction": "Long", "result": "Win", "r": "2.89", "violations": "0", "type": "Breakout", "grade": "B+", "exec_grade": "", "mins_in_trade": "237", "mins_in_drawdown": "0"},
+{"date": "2026-03-05", "trade_no": "1", "direction": "Short", "result": "Loss", "r": "-1", "violations": "1", "type": "Breakout", "grade": "C", "exec_grade": "", "mins_in_trade": "15", "mins_in_drawdown": "15"},
+{"date": "2026-03-05", "trade_no": "2", "direction": "Short", "result": "Win", "r": "2.82", "violations": "0", "type": "Breakout", "grade": "B", "exec_grade": "", "mins_in_trade": "647", "mins_in_drawdown": "18"},
+{"date": "2026-03-08", "trade_no": "3", "direction": "Short", "result": "Loss", "r": "-0.5", "violations": "1", "type": "Breakout", "grade": "C", "exec_grade": "", "mins_in_trade": "45", "mins_in_drawdown": "30"},
+{"date": "2026-03-09", "trade_no": "4", "direction": "Short", "result": "Loss", "r": "-1", "violations": "0", "type": "Range-Bound", "grade": "C+", "exec_grade": "", "mins_in_trade": "616", "mins_in_drawdown": "240"},
+{"date": "2026-03-10", "trade_no": "3", "direction": "Long", "result": "Loss", "r": "-1", "violations": "1", "type": "Breakout", "grade": "C", "exec_grade": "", "mins_in_trade": "21", "mins_in_drawdown": "12"},
+{"date": "2026-03-10", "trade_no": "5", "direction": "Short", "result": "Win", "r": "1", "violations": "0", "type": "Range-Bound", "grade": "C", "exec_grade": "", "mins_in_trade": "1109", "mins_in_drawdown": "2"},
+{"date": "2026-03-11", "trade_no": "4", "direction": "Long", "result": "Loss", "r": "-1", "violations": "0", "type": "Breakout", "grade": "B-", "exec_grade": "", "mins_in_trade": "498", "mins_in_drawdown": "431"},
+{"date": "2026-03-12", "trade_no": "5", "direction": "Long", "result": "Win", "r": "2.91", "violations": "0", "type": "Breakout", "grade": "C+", "exec_grade": "", "mins_in_trade": "532", "mins_in_drawdown": "25"},
+{"date": "2026-03-13", "trade_no": "6", "direction": "Short", "result": "Win", "r": "2.76", "violations": "0", "type": "Range-Bound", "grade": "C+", "exec_grade": "", "mins_in_trade": "147", "mins_in_drawdown": "6"},
+{"date": "2026-03-15", "trade_no": "6", "direction": "Long", "result": "Win", "r": "0.705", "violations": "0", "type": "Breakout", "grade": "B", "exec_grade": "", "mins_in_trade": "2", "mins_in_drawdown": "0"},
+{"date": "2026-03-17", "trade_no": "7", "direction": "Long", "result": "Loss", "r": "-1", "violations": "1", "type": "Range-Bound", "grade": "B-", "exec_grade": "", "mins_in_trade": "397", "mins_in_drawdown": "89"},
+{"date": "2026-03-18", "trade_no": "7", "direction": "Short", "result": "Win", "r": "1.82", "violations": "0", "type": "Breakout", "grade": "B-", "exec_grade": "", "mins_in_trade": "63", "mins_in_drawdown": "1"},
+{"date": "2026-03-18", "trade_no": "8", "direction": "Long", "result": "Loss", "r": "-0.5", "violations": "2", "type": "Breakout", "grade": "D", "exec_grade": "", "mins_in_trade": "62", "mins_in_drawdown": "61"},
+{"date": "2026-03-19", "trade_no": "9", "direction": "Long", "result": "Loss", "r": "-1", "violations": "1", "type": "Range-Bound", "grade": "B", "exec_grade": "", "mins_in_trade": "48", "mins_in_drawdown": "23"},
+{"date": "2026-03-20", "trade_no": "8", "direction": "Short", "result": "Loss", "r": "-2", "violations": "1", "type": "Breakout", "grade": "B-", "exec_grade": "", "mins_in_trade": "388", "mins_in_drawdown": "156"},
+{"date": "2026-03-22", "trade_no": "10", "direction": "Long", "result": "Loss", "r": "-0.5", "violations": "0", "type": "Range-Bound", "grade": "B", "exec_grade": "", "mins_in_trade": "252", "mins_in_drawdown": "199"},
+{"date": "2026-03-23", "trade_no": "9", "direction": "Short", "result": "Win", "r": "0.1975", "violations": "0", "type": "Range-Bound", "grade": "B", "exec_grade": "", "mins_in_trade": "1056", "mins_in_drawdown": "0"},
+{"date": "2026-03-24", "trade_no": "10", "direction": "Short", "result": "Loss", "r": "-1", "violations": "1", "type": "Breakout", "grade": "B+", "exec_grade": "", "mins_in_trade": "295", "mins_in_drawdown": "56"},
+{"date": "2026-03-25", "trade_no": "11", "direction": "Short", "result": "BE", "r": "0", "violations": "2", "type": "Range-Bound", "grade": "B-", "exec_grade": "", "mins_in_trade": "121", "mins_in_drawdown": "30"},
+{"date": "2026-03-26", "trade_no": "12", "direction": "Short", "result": "Win", "r": "4.34", "violations": "0", "type": "Breakout", "grade": "B+", "exec_grade": "", "mins_in_trade": "1183", "mins_in_drawdown": "21"},
+{"date": "2026-03-31", "trade_no": "1", "direction": "Long", "result": "BE", "r": "0", "violations": "0", "type": "Breakout", "grade": "B", "exec_grade": "", "mins_in_trade": "1944", "mins_in_drawdown": "165"},
+{"date": "2026-04-01", "trade_no": "2", "direction": "Long", "result": "Loss", "r": "-1", "violations": "1", "type": "Breakout", "grade": "B", "exec_grade": "", "mins_in_trade": "55", "mins_in_drawdown": "45"},
+{"date": "2026-04-02", "trade_no": "3", "direction": "Long", "result": "Loss", "r": "-1", "violations": "1", "type": "Breakout", "grade": "B+", "exec_grade": "", "mins_in_trade": "571", "mins_in_drawdown": "514"},
+{"date": "2026-04-03", "trade_no": "1", "direction": "Short", "result": "Loss", "r": "-1", "violations": "0", "type": "Range-Bound", "grade": "B", "exec_grade": "", "mins_in_trade": "781", "mins_in_drawdown": "720"},
+{"date": "2026-04-07", "trade_no": "2", "direction": "Short", "result": "Loss", "r": "-1", "violations": "0", "type": "Breakout", "grade": "B", "exec_grade": "", "mins_in_trade": "229", "mins_in_drawdown": "95"},
+{"date": "2026-04-08", "trade_no": "3", "direction": "Short", "result": "Loss", "r": "-1", "violations": "0", "type": "Breakout", "grade": "B+", "exec_grade": "", "mins_in_trade": "992", "mins_in_drawdown": "720"},
+{"date": "2026-04-09", "trade_no": "4", "direction": "Short", "result": "Loss", "r": "-1", "violations": "0", "type": "Breakout", "grade": "B+", "exec_grade": "", "mins_in_trade": "28", "mins_in_drawdown": "24"},
+{"date": "2026-04-10", "trade_no": "4", "direction": "Long", "result": "Win", "r": "2.08", "violations": "0", "type": "Breakout", "grade": "B", "exec_grade": "", "mins_in_trade": "95", "mins_in_drawdown": "7"},
+{"date": "2026-04-10", "trade_no": "5", "direction": "Short", "result": "Loss", "r": "-1", "violations": "1", "type": "Range-Bound", "grade": "B", "exec_grade": "", "mins_in_trade": "61", "mins_in_drawdown": "61"},
+{"date": "2026-04-12", "trade_no": "6", "direction": "Short", "result": "Loss", "r": "-1", "violations": "0", "type": "Breakout", "grade": "B+", "exec_grade": "", "mins_in_trade": "921", "mins_in_drawdown": "921"},
+{"date": "2026-04-13", "trade_no": "7", "direction": "Short", "result": "Loss", "r": "-0.25", "violations": "0", "type": "Range-Bound", "grade": "C+", "exec_grade": "", "mins_in_trade": "160", "mins_in_drawdown": "160"},
+{"date": "2026-04-14", "trade_no": "8", "direction": "Short", "result": "Loss", "r": "-1.6875", "violations": "0", "type": "Range-Bound", "grade": "B+", "exec_grade": "", "mins_in_trade": "3075", "mins_in_drawdown": "1335"},
+{"date": "2026-04-15", "trade_no": "9", "direction": "Short", "result": "Loss", "r": "-1", "violations": "0", "type": "Breakout", "grade": "B", "exec_grade": "", "mins_in_trade": "17", "mins_in_drawdown": "17"},
+{"date": "2026-04-15", "trade_no": "10", "direction": "Short", "result": "Loss", "r": "-0.5", "violations": "1", "type": "Breakout", "grade": "B", "exec_grade": "", "mins_in_trade": "210", "mins_in_drawdown": "180"},
+{"date": "2026-04-16", "trade_no": "5", "direction": "Long", "result": "Win", "r": "0.9", "violations": "0", "type": "Range-Bound", "grade": "A", "exec_grade": "", "mins_in_trade": "883", "mins_in_drawdown": "232"},
+{"date": "2026-04-19", "trade_no": "6", "direction": "Long", "result": "Loss", "r": "-1", "violations": "0", "type": "Breakout", "grade": "A", "exec_grade": "", "mins_in_trade": "49", "mins_in_drawdown": "20"},
+{"date": "2026-04-19", "trade_no": "11", "direction": "Short", "result": "Win", "r": "1", "violations": "0", "type": "Range-Bound", "grade": "B", "exec_grade": "", "mins_in_trade": "78", "mins_in_drawdown": "0"},
+{"date": "2026-04-21", "trade_no": "7", "direction": "Long", "result": "Loss", "r": "-1", "violations": "0", "type": "Range-Bound", "grade": "B", "exec_grade": "", "mins_in_trade": "24", "mins_in_drawdown": "24"},
+{"date": "2026-04-21", "trade_no": "12", "direction": "Short", "result": "Loss", "r": "-1", "violations": "0", "type": "Breakout", "grade": "C", "exec_grade": "", "mins_in_trade": "527", "mins_in_drawdown": "210"},
+{"date": "2026-04-22", "trade_no": "13", "direction": "Short", "result": "BE", "r": "0", "violations": "0", "type": "Range-Bound", "grade": "B", "exec_grade": "", "mins_in_trade": "603", "mins_in_drawdown": "79"},
+{"date": "2026-04-23", "trade_no": "8", "direction": "Long", "result": "Loss", "r": "-1", "violations": "0", "type": "Range-Bound", "grade": "B", "exec_grade": "", "mins_in_trade": "192", "mins_in_drawdown": "34"},
+{"date": "2026-04-24", "trade_no": "14", "direction": "Short", "result": "Loss", "r": "-0.75", "violations": "0", "type": "Range-Bound", "grade": "C", "exec_grade": "", "mins_in_trade": "34", "mins_in_drawdown": "34"},
+{"date": "2026-04-26", "trade_no": "9", "direction": "Long", "result": "Win", "r": "3.1", "violations": "0", "type": "Breakout", "grade": "A+", "exec_grade": "", "mins_in_trade": "406", "mins_in_drawdown": "45"},
+{"date": "2026-04-27", "trade_no": "10", "direction": "Long", "result": "Loss", "r": "-1", "violations": "0", "type": "Range-Bound", "grade": "C", "exec_grade": "", "mins_in_trade": "31", "mins_in_drawdown": "11"},
+{"date": "2026-04-30", "trade_no": "15", "direction": "Short", "result": "Loss", "r": "-1", "violations": "1", "type": "Range-Bound", "grade": "C", "exec_grade": "", "mins_in_trade": "644", "mins_in_drawdown": "644"},
+{"date": "2026-05-03", "trade_no": "1", "direction": "Short", "result": "Loss", "r": "-1", "violations": "1", "type": "Range-Bound", "grade": "B", "exec_grade": "", "mins_in_trade": "92", "mins_in_drawdown": "92"},
+{"date": "2026-05-05", "trade_no": "1", "direction": "Long", "result": "Loss", "r": "-0.75", "violations": "2", "type": "Breakout", "grade": "C-", "exec_grade": "", "mins_in_trade": "156", "mins_in_drawdown": "156"},
+{"date": "2026-05-06", "trade_no": "2", "direction": "Short", "result": "Loss", "r": "-0.75", "violations": "1", "type": "Breakout", "grade": "B", "exec_grade": "", "mins_in_trade": "5310", "mins_in_drawdown": "1395"},
+{"date": "2026-05-10", "trade_no": "2", "direction": "Long", "result": "Loss", "r": "-1", "violations": "0", "type": "Breakout", "grade": "B", "exec_grade": "", "mins_in_trade": "585", "mins_in_drawdown": "1"},
+{"date": "2026-05-12", "trade_no": "3", "direction": "Short", "result": "Loss", "r": "-0.75", "violations": "0", "type": "Breakout", "grade": "B", "exec_grade": "", "mins_in_trade": "549", "mins_in_drawdown": "471"},
+{"date": "2026-05-27", "trade_no": "4", "direction": "Short", "result": "Win", "r": "0.54", "violations": "0", "type": "Breakout", "grade": "B+", "exec_grade": "", "mins_in_trade": "556", "mins_in_drawdown": "105"},
+{"date": "2026-06-03", "trade_no": "1", "direction": "Short", "result": "Win", "r": "3.8", "violations": "0", "type": "Breakout", "grade": "A-", "exec_grade": "", "mins_in_trade": "586", "mins_in_drawdown": "0"},
+{"date": "2026-06-05", "trade_no": "2", "direction": "Short", "result": "Loss", "r": "-1", "violations": "0", "type": "Breakout", "grade": "D", "exec_grade": "", "mins_in_trade": "147", "mins_in_drawdown": "42"},
+{"date": "2026-06-10", "trade_no": "1", "direction": "Long", "result": "Loss", "r": "-1", "violations": "2", "type": "Breakout", "grade": "C", "exec_grade": "", "mins_in_trade": "105", "mins_in_drawdown": "83"},
+{"date": "2026-06-11", "trade_no": "3", "direction": "Short", "result": "Loss", "r": "-1", "violations": "0", "type": "Range-Bound", "grade": "B", "exec_grade": "", "mins_in_trade": "152", "mins_in_drawdown": "4"},
+{"date": "2026-06-16", "trade_no": "2", "direction": "Long", "result": "Loss", "r": "-1", "violations": "1", "type": "Range-Bound", "grade": "C", "exec_grade": "", "mins_in_trade": "661", "mins_in_drawdown": "643"},
+{"date": "2026-06-17", "trade_no": "3", "direction": "Long", "result": "BE", "r": "0", "violations": "0", "type": "Range-Bound", "grade": "B", "exec_grade": "", "mins_in_trade": "142", "mins_in_drawdown": "1"},
+{"date": "2026-06-23", "trade_no": "4", "direction": "Short", "result": "Loss", "r": "-1", "violations": "2", "type": "Breakout", "grade": "C", "exec_grade": "", "mins_in_trade": "330", "mins_in_drawdown": "330"},
+{"date": "2026-06-25", "trade_no": "4", "direction": "Long", "result": "Loss", "r": "-1", "violations": "0", "type": "Range-Bound", "grade": "D", "exec_grade": "", "mins_in_trade": "570", "mins_in_drawdown": "195"},
+{"date": "2026-06-26", "trade_no": "5", "direction": "Short", "result": "Loss", "r": "-1", "violations": "0", "type": "Range-Bound", "grade": "B", "exec_grade": "", "mins_in_trade": "1200", "mins_in_drawdown": "780"},
+{"date": "2026-07-15", "trade_no": "1", "direction": "Short", "result": "Win", "r": "2.25", "violations": "0", "type": "Range-Bound", "grade": "A", "exec_grade": "", "mins_in_trade": "2005", "mins_in_drawdown": "5"},
+{"date": "2026-07-22", "trade_no": "1", "direction": "Long", "result": "Loss", "r": "-1", "violations": "1", "type": "Range-Bound", "grade": "B", "exec_grade": "", "mins_in_trade": "1510", "mins_in_drawdown": "754"},
+{"date": "2026-07-23", "trade_no": "2", "direction": "Long", "result": "Loss", "r": "-1", "violations": "2", "type": "Range-Bound", "grade": "C", "exec_grade": "", "mins_in_trade": "1357", "mins_in_drawdown": "120"},
+{"date": "2026-07-28", "trade_no": "3", "direction": "Long", "result": "BE", "r": "0", "violations": "0", "type": "Range-Bound", "grade": "A-", "exec_grade": "", "mins_in_trade": "1308", "mins_in_drawdown": "0"},
+{"date": "2026-07-29", "trade_no": "4", "direction": "Long", "result": "BE", "r": "0", "violations": "1", "type": "Range-Bound", "grade": "B", "exec_grade": "", "mins_in_trade": "2099", "mins_in_drawdown": "1"},
+{"date": "2026-08-04", "trade_no": "1", "direction": "Long", "result": "Loss", "r": "-0.625", "violations": "1", "type": "Breakout", "grade": "A", "exec_grade": "", "mins_in_trade": "8585", "mins_in_drawdown": "15"},
+{"date": "2026-08-13", "trade_no": "2", "direction": "Long", "result": "BE", "r": "0", "violations": "1", "type": "Range-Bound", "grade": "C", "exec_grade": "", "mins_in_trade": "803", "mins_in_drawdown": "0"},
+{"date": "2026-08-17", "trade_no": "1", "direction": "Short", "result": "Loss", "r": "-1", "violations": "2", "type": "Range-Bound", "grade": "C-", "exec_grade": "", "mins_in_trade": "65", "mins_in_drawdown": "65"},
+{"date": "2026-08-27", "trade_no": "3", "direction": "Long", "result": "Win", "r": "0.665", "violations": "0", "type": "Breakout", "grade": "A", "exec_grade": "", "mins_in_trade": "847", "mins_in_drawdown": "0"},
+{"date": "2026-08-27", "trade_no": "4", "direction": "Long", "result": "Loss", "r": "-1", "violations": "2", "type": "Range-Bound", "grade": "C", "exec_grade": "", "mins_in_trade": "611", "mins_in_drawdown": "0"},
+{"date": "2026-08-31", "trade_no": "1", "direction": "Short", "result": "Win", "r": "0.77", "violations": "1", "type": "Range-Bound", "grade": "B-", "exec_grade": "C-", "mins_in_trade": "531", "mins_in_drawdown": "45"},
+{"date": "2026-09-01", "trade_no": "2", "direction": "Short", "result": "Win", "r": "2.06975", "violations": "0", "type": "Breakout", "grade": "A-", "exec_grade": "A", "mins_in_trade": "209", "mins_in_drawdown": "0"},
+{"date": "2026-09-02", "trade_no": "1", "direction": "Long", "result": "Win", "r": "0.25", "violations": "2", "type": "Breakout", "grade": "C-", "exec_grade": "B+", "mins_in_trade": "905", "mins_in_drawdown": "360"},
+{"date": "2026-09-09", "trade_no": "3", "direction": "Short", "result": "Win", "r": "2.64", "violations": "0", "type": "Range-Bound", "grade": "B+", "exec_grade": "A", "mins_in_trade": "508", "mins_in_drawdown": "0"},
+{"date": "2026-09-15", "trade_no": "2", "direction": "Long", "result": "Loss", "r": "-1", "violations": "3", "type": "Range-Bound", "grade": "D", "exec_grade": "B-", "mins_in_trade": "286", "mins_in_drawdown": "11"},
+{"date": "2026-09-20", "trade_no": "3", "direction": "Long", "result": "Win", "r": "0.515", "violations": "2", "type": "Range-Bound", "grade": "B-", "exec_grade": "A-", "mins_in_trade": "1032", "mins_in_drawdown": "30"},
+{"date": "2026-09-21", "trade_no": "4", "direction": "Long", "result": "Loss", "r": "-1", "violations": "0", "type": "Breakout", "grade": "B-", "exec_grade": "A", "mins_in_trade": "2858", "mins_in_drawdown": "630"},
+{"date": "2026-09-24", "trade_no": "5", "direction": "Long", "result": "Loss", "r": "-1", "violations": "2", "type": "Range-Bound", "grade": "C", "exec_grade": "C", "mins_in_trade": "4334", "mins_in_drawdown": "2880"},
+{"date": "2026-09-30", "trade_no": "6", "direction": "Long", "result": "Loss", "r": "-1", "violations": "0", "type": "Breakout", "grade": "C", "exec_grade": "A", "mins_in_trade": "220", "mins_in_drawdown": "220"},
+{"date": "2026-10-01", "trade_no": "7", "direction": "Long", "result": "Win", "r": "2.08", "violations": "0", "type": "Breakout", "grade": "C+", "exec_grade": "A", "mins_in_trade": "1211", "mins_in_drawdown": "0"}
+];
 
 const css = v => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
 const C = { profit: css('--profit'), loss: css('--loss'), equity: css('--equity'),
@@ -301,30 +313,48 @@ Chart.defaults.color = C.muted;
 Chart.defaults.borderColor = C.grid;
 Chart.defaults.plugins.legend.display = false;
 
-let charts = [];
-const fR = n => (n >= 0 ? '+' : '') + n.toFixed(2) + 'R';
+// Round half away from zero on the decimal value, not its binary noise (-6.665 -> -6.67), as Python and SQL do.
+const round2 = n => Math.sign(n) * Math.round(Math.abs(n).toFixed(10) + 'e2') / 100;
+const fR = n => { const v = round2(n); return (v >= 0 ? '+' : '') + v.toFixed(2) + 'R'; };
 const gradeBucket = g => { g = String(g || '?'); return 'ABCD'.includes(g[0]) ? g[0] : '?'; };
 
 function analyse(rows) {
+  const num = v => (v == null || String(v).trim() === '') ? null : Number(v);   // blank = missing, not 0
   rows = rows.filter(r => r.date && r.result && !isNaN(parseFloat(r.r)))
-             .map(r => ({ ...r, r: parseFloat(r.r), violations: parseInt(r.violations) || 0 }))
-             .sort((a, b) => String(a.date).localeCompare(String(b.date)));
-  if (!rows.length) { alert('No valid rows found - see footer for expected columns.'); return; }
+             .map(r => ({ ...r, r: parseFloat(r.r), ru: Math.round(parseFloat(r.r) * 1e6),
+                           violations: parseInt(r.violations) || 0,
+                           exec_grade: String(r.exec_grade || '').trim(),
+                           mins_in_trade: num(r.mins_in_trade), mins_in_drawdown: num(r.mins_in_drawdown) }))
+             // date, then trade number: the order the README defines, not the order of the text
+             .sort((a, b) => String(a.date).localeCompare(String(b.date)) || Number(a.trade_no) - Number(b.trade_no));
+  if (!rows.length) { alert('No valid rows in the embedded data - rerun update_data.py.'); return; }
 
   const wins = rows.filter(r => r.result === 'Win'),
         losses = rows.filter(r => r.result === 'Loss');
-  const netR = rows.reduce((s, r) => s + r.r, 0);
+  // Totals add R as whole millionths (ru; R can have up to 5 decimals) and divide once: float sums drift off exact halves.
+  const sumR = a => a.reduce((s, r) => s + r.ru, 0) / 1e6;
+  const netR = sumR(rows);
   let cum = 0, peak = 0, maxDD = 0;
-  const eq = rows.map(r => { cum += r.r; peak = Math.max(peak, cum);
-    maxDD = Math.min(maxDD, cum - peak); return { d: r.date, v: cum, dd: cum - peak }; });
+  const eq = rows.map(r => { cum += r.ru; peak = Math.max(peak, cum); maxDD = Math.min(maxDD, cum - peak);
+    return { d: r.date, v: cum / 1e6, dd: (cum - peak) / 1e6 }; });
+  maxDD /= 1e6;
   const clean = rows.filter(r => r.violations === 0), vio = rows.filter(r => r.violations > 0);
-  const exp = a => a.length ? a.reduce((s, r) => s + r.r, 0) / a.length : 0;
+  const exp = a => a.length ? sumR(a) / a.length : 0;
+  // Win rate excludes break-even; null when nothing was decided.
+  const wr = a => { const w = a.filter(r => r.result === 'Win').length, l = a.filter(r => r.result === 'Loss').length;
+    return w + l ? 100 * w / (w + l) : null; };
 
   let streak = 0, worst = 0;
   rows.forEach(r => { streak = r.result === 'Loss' ? streak + 1 : 0; worst = Math.max(worst, streak); });
 
   document.getElementById('range').textContent =
     rows[0].date + ' → ' + rows[rows.length - 1].date;
+  /* sidebar footer: month span and trade count come from the data, so they cannot go stale */
+  const MON = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  const [y0, m0] = rows[0].date.split('-'), [y1, m1] = rows[rows.length - 1].date.split('-');
+  const span = y0 === y1 ? `${MON[m0 - 1]}-${MON[m1 - 1]} ${y1}` : `${MON[m0 - 1]} ${y0}-${MON[m1 - 1]} ${y1}`;
+  document.getElementById('foot').innerHTML =
+    `Nathan Yap · ${span}<br>${rows.length} trades · crypto derivatives`;
 
   /* hero */
   document.getElementById('gaugepct').textContent = Math.round(100 * clean.length / rows.length) + '%';
@@ -332,10 +362,10 @@ function analyse(rows) {
   document.getElementById('stat-streak').textContent = 'longest losing streak · ' + worst;
   const netEl = document.getElementById('stat-net');
   netEl.textContent = fR(netR); netEl.className = 'num ' + (netR >= 0 ? 'pos' : 'neg');
-  document.getElementById('stat-clean').textContent = 'rule-compliant only · ' + fR(clean.reduce((s,r)=>s+r.r,0));
+  document.getElementById('stat-clean').textContent = 'rule-compliant only · ' + fR(sumR(clean));
 
   const kpis = [
-    ['Win rate (excl BE)', (100 * wins.length / (wins.length + losses.length)).toFixed(1) + '%', ''],
+    ['Win rate (excl BE)', (wr(rows) ?? 0).toFixed(1) + '%', ''],
     ['Expectancy / trade', fR(netR / rows.length), netR >= 0 ? 'pos' : 'neg'],
     ['Avg win / avg loss', (exp(wins) / Math.abs(exp(losses))).toFixed(2), ''],
     ['Max drawdown', fR(maxDD), 'neg'],
@@ -346,35 +376,33 @@ function analyse(rows) {
   document.getElementById('kpis').innerHTML = kpis.map(([l, v, c]) =>
     `<div class="kpi"><div class="label">${l}</div><div class="value ${c}">${v}</div></div>`).join('');
 
-  charts.forEach(c => c.destroy()); charts = [];
-
   /* hero monthly mini */
   const mo = {};
-  rows.forEach(r => { const m = String(r.date).slice(0, 7); mo[m] = (mo[m] || 0) + r.r; });
+  rows.forEach(r => { const m = String(r.date).slice(0, 7); mo[m] = (mo[m] || 0) + r.ru; });
   const moKeys = Object.keys(mo).sort();
-  charts.push(new Chart(document.getElementById('heromonthly'), {
+  new Chart(document.getElementById('heromonthly'), {
     type: 'bar',
-    data: { labels: moKeys.map(m => m.slice(5)), datasets: [{ data: moKeys.map(m => mo[m]),
+    data: { labels: moKeys.map(m => m.slice(5)), datasets: [{ data: moKeys.map(m => mo[m] / 1e6),
       backgroundColor: moKeys.map(m => mo[m] >= 0 ? C.ink : 'rgba(24,24,27,.25)'),
       borderRadius: 6, maxBarThickness: 26 }] },
     options: { maintainAspectRatio: false,
       plugins: { tooltip: { callbacks: { label: c => fR(c.parsed.y) } } },
       scales: { y: { ticks: { callback: v => v + 'R' }, grid: { color: 'rgba(24,24,27,.06)' } },
                 x: { grid: { display: false } } } }
-  }));
+  });
 
   /* gauge */
   const pct = clean.length / rows.length;
-  charts.push(new Chart(document.getElementById('gauge'), {
+  new Chart(document.getElementById('gauge'), {
     type: 'doughnut',
     data: { datasets: [{ data: [pct, 1 - pct],
       backgroundColor: [C.ink, 'rgba(24,24,27,.12)'], borderWidth: 0 }] },
     options: { maintainAspectRatio: false, cutout: '78%', rotation: -110, circumference: 220,
       plugins: { tooltip: { enabled: false } } }
-  }));
+  });
 
   /* equity */
-  charts.push(new Chart(document.getElementById('equitychart'), {
+  new Chart(document.getElementById('equitychart'), {
     data: { labels: eq.map(e => e.d), datasets: [
       { type: 'line', data: eq.map(e => e.v), borderColor: C.equity, borderWidth: 2,
         pointRadius: 0, tension: .25, label: 'Equity (R)' },
@@ -384,12 +412,12 @@ function analyse(rows) {
       plugins: { tooltip: { callbacks: { label: c => c.dataset.label + ': ' + fR(c.parsed.y) } } },
       scales: { x: { grid: { display: false }, ticks: { maxTicksLimit: 9 } },
                 y: { ticks: { callback: v => v + 'R' } } } }
-  }));
+  });
 
   /* discipline */
   const disc = [['Compliant (' + clean.length + ')', exp(clean)],
                 ['Violated (' + vio.length + ')', exp(vio)]];
-  charts.push(new Chart(document.getElementById('disciplinechart'), {
+  new Chart(document.getElementById('disciplinechart'), {
     type: 'bar',
     data: { labels: disc.map(d => d[0]), datasets: [{ data: disc.map(d => d[1]), minBarLength: 4,
       backgroundColor: disc.map(d => d[1] >= 0 ? C.profit : C.loss), borderRadius: 6 }] },
@@ -398,13 +426,12 @@ function analyse(rows) {
       plugins: { tooltip: { callbacks: { label: c => 'expectancy ' + fR(c.parsed.x) } } },
       scales: { x: { ticks: { callback: v => v + 'R' } },
                 y: { grid: { display: false }, ticks: { autoSkip: false, crossAlign: 'far' } } } }
-  }));
+  });
 
   /* grade */
-  const gd = {};
-  rows.forEach(r => { (gd[gradeBucket(r.grade)] = gd[gradeBucket(r.grade)] || []).push(r); });
+  const gd = Object.groupBy(rows, r => gradeBucket(r.grade));
   const gKeys = ['A', 'B', 'C', 'D'].filter(k => gd[k]);
-  charts.push(new Chart(document.getElementById('grade'), {
+  new Chart(document.getElementById('grade'), {
     type: 'bar',
     data: { labels: gKeys.map(k => k + ' (' + gd[k].length + ')'),
       datasets: [{ data: gKeys.map(k => exp(gd[k])), borderRadius: 6,
@@ -412,10 +439,10 @@ function analyse(rows) {
     options: { maintainAspectRatio: false,
       plugins: { tooltip: { callbacks: { label: c => 'expectancy ' + fR(c.parsed.y) } } },
       scales: { y: { ticks: { callback: v => v + 'R' } }, x: { grid: { display: false } } } }
-  }));
+  });
 
   /* per-trade R */
-  charts.push(new Chart(document.getElementById('pertrade'), {
+  new Chart(document.getElementById('pertrade'), {
     type: 'bar',
     data: { labels: rows.map((r, i) => '#' + (i + 1) + ' ' + r.date),
       datasets: [{ data: rows.map(r => r.r),
@@ -424,7 +451,7 @@ function analyse(rows) {
     options: { maintainAspectRatio: false,
       plugins: { tooltip: { callbacks: { label: c => fR(c.parsed.y) } } },
       scales: { x: { display: false }, y: { ticks: { callback: v => v + 'R' } } } }
-  }));
+  });
 
   /* distribution */
   const bins = { '≤ -1R': 0, '-1R to 0': 0, 'BE': 0, '0 to 1.5R': 0, '1.5R to 3R': 0, '> 3R': 0 };
@@ -432,25 +459,20 @@ function analyse(rows) {
     if (t.result === 'BE') bins['BE']++;
     else if (r <= -1) bins['≤ -1R']++; else if (r < 0) bins['-1R to 0']++;
     else if (r <= 1.5) bins['0 to 1.5R']++; else if (r <= 3) bins['1.5R to 3R']++; else bins['> 3R']++; });
-  charts.push(new Chart(document.getElementById('rdist'), {
+  new Chart(document.getElementById('rdist'), {
     type: 'bar',
     data: { labels: Object.keys(bins), datasets: [{ data: Object.values(bins), borderRadius: 6,
       backgroundColor: [C.loss, C.loss, 'rgba(24,24,27,.25)', C.profit, C.profit, C.profit] }] },
     options: { maintainAspectRatio: false,
       scales: { y: { ticks: { precision: 0 } }, x: { grid: { display: false } } } }
-  }));
+  });
 
   /* type: breakout vs range-bound */
-  const ty = {};
-  rows.forEach(r => { const k = r.type || 'Unlabelled'; (ty[k] = ty[k] || []).push(r); });
+  const ty = Object.groupBy(rows, r => r.type || 'Unlabelled');
   const tKeys = Object.keys(ty).sort((a, b) => exp(ty[b]) - exp(ty[a]));
-  const tNet = k => ty[k].reduce((s, r) => s + r.r, 0);
-  const tWr = k => {
-    const w = ty[k].filter(r => r.result === 'Win').length,
-          l = ty[k].filter(r => r.result === 'Loss').length;
-    return (w + l) ? 100 * w / (w + l) : 0;
-  };
-  charts.push(new Chart(document.getElementById('typechart'), {
+  const tNet = k => sumR(ty[k]);
+  const tWr = k => wr(ty[k]) ?? 0;
+  new Chart(document.getElementById('typechart'), {
     type: 'bar',
     data: { labels: tKeys.map(k => k + ' (' + ty[k].length + ')'),
       datasets: [{ data: tKeys.map(k => exp(ty[k])), borderRadius: 6, minBarLength: 4,
@@ -463,8 +485,8 @@ function analyse(rows) {
                      'win rate ' + tWr(tKeys[c.dataIndex]).toFixed(0) + '%'] } } },
       scales: { x: { ticks: { callback: v => v + 'R' } },
                 y: { grid: { display: false }, ticks: { autoSkip: false, crossAlign: 'far' } } } }
-  }));
-  charts.push(new Chart(document.getElementById('typewin'), {
+  });
+  new Chart(document.getElementById('typewin'), {
     type: 'bar',
     data: { labels: tKeys.map(k => k + ' (' + ty[k].length + ')'),
       datasets: [{ data: tKeys.map(tWr), borderRadius: 6,
@@ -473,7 +495,30 @@ function analyse(rows) {
       plugins: { tooltip: { callbacks: { label: c => c.parsed.y.toFixed(1) + '% win rate' } } },
       scales: { y: { ticks: { callback: v => v + '%' }, suggestedMax: 60 },
                 x: { grid: { display: false } } } }
-  }));
+  });
+
+  /* time in trade and in drawdown: winners vs losers, break-even excluded, blanks skipped */
+  const hm = m => { const t = Math.round(m); return Math.floor(t / 60) + 'h ' + (t % 60) + 'm'; };
+  const avgMins = (a, k) => {
+    const v = a.map(r => r[k]).filter(x => x !== null);
+    return v.length ? hm(v.reduce((s, x) => s + x, 0) / v.length) + ` <span class="n">(${v.length})</span>` : 'n/a';
+  };
+  document.getElementById('timetable').innerHTML =
+    '<tr><th class="l"></th><th>Winners</th><th>Losers</th></tr>' +
+    [['Avg time in trade', 'mins_in_trade'], ['Avg time in drawdown', 'mins_in_drawdown']].map(([label, k]) =>
+      `<tr><td class="l">${label}</td><td>${avgMins(wins, k)}</td><td>${avgMins(losses, k)}</td></tr>`).join('');
+
+  /* execution grade: only trades that have one, grouped by letter */
+  const graded = rows.filter(r => r.exec_grade), eg = Object.groupBy(graded, r => gradeBucket(r.exec_grade));
+  document.getElementById('execsub').textContent = 'win rate (excl. break-even) and average R · ' +
+    graded.length + ' graded trade' + (graded.length === 1 ? '' : 's');
+  document.getElementById('exectable').innerHTML =
+    '<tr><th class="l">Grade</th><th>Trades</th><th>Win rate</th><th>Avg R</th></tr>' +
+    (graded.length ? Object.keys(eg).sort().map(k => {
+      const g = eg[k], p = wr(g);
+      return `<tr><td class="l">${k}</td><td>${g.length}</td>
+        <td>${p === null ? 'n/a' : p.toFixed(1) + '%'}</td><td>${fR(exp(g))}</td></tr>`;
+    }).join('') : '<tr><td class="l" colspan="4">no graded trades yet</td></tr>');
 
   /* table */
   document.getElementById('logtable').innerHTML =
@@ -487,41 +532,8 @@ function analyse(rows) {
       <td class="l"><span class="pill ${r.result.toLowerCase()}">${r.result}</span></td></tr>`).join('');
 }
 
-/* ---------- loaders ---------- */
-function loadEmbedded() {
-  document.getElementById('fname').textContent = 'my journal · embedded';
-  analyse(Papa.parse(MY_JOURNAL, { header: true, skipEmptyLines: true }).data);
-}
-loadEmbedded();
-document.getElementById('reload').addEventListener('click', e => { e.preventDefault(); loadEmbedded(); });
-
-function fromMasterSheet(wb) {
-  const raw = XLSX.utils.sheet_to_json(wb.Sheets['Master'], { header: 1, cellDates: true });
-  const out = [];
-  for (const row of raw.slice(1)) {
-    const [month, direction, date, no, result, r, v1, v2, v3, v4, v5, type, grade] = row;
-    if (!(date instanceof Date) || !['Win', 'Loss', 'BE'].includes(result)) continue;
-    out.push({ date: date.toISOString().slice(0, 10), direction, result, r,
-      violations: [v1, v2, v3, v4, v5].filter(Boolean).length, type, grade });
-  }
-  return out;
-}
-
-document.getElementById('csv').addEventListener('change', e => {
-  const f = e.target.files[0]; if (!f) return;
-  document.getElementById('fname').textContent = f.name;
-  if (/\.xlsx?$|\.xls$/i.test(f.name)) {
-    const reader = new FileReader();
-    reader.onload = ev => {
-      const wb = XLSX.read(ev.target.result, { cellDates: true });
-      if (wb.SheetNames.includes('Master')) { analyse(fromMasterSheet(wb)); return; }
-      analyse(XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { defval: '' }));
-    };
-    reader.readAsArrayBuffer(f);
-  } else {
-    Papa.parse(f, { header: true, skipEmptyLines: true, complete: res => analyse(res.data) });
-  }
-});
+/* ---------- data ---------- */
+analyse(MY_JOURNAL);
 
 /* ---------- sidebar toggle ---------- */
 document.getElementById('navtoggle').addEventListener('click', () =>

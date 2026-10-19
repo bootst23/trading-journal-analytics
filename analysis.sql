@@ -2,18 +2,26 @@
 -- Trading Journal Analysis (SQLite) - R-multiple based
 -- Author: Nathan Yap Hao Kang
 --
--- Setup (typed table first - a raw .import makes every column
--- TEXT and silently breaks numeric comparisons):
+-- Setup (the typed table is defined once, in update_data.py's SCHEMA):
 --
---   sqlite3 journal.db
---   CREATE TABLE trades (
---       date TEXT, month TEXT, direction TEXT, trade_no INTEGER,
---       result TEXT, r REAL, v1 TEXT, v2 TEXT, v3 TEXT, v4 TEXT,
---       violations INTEGER, type TEXT, grade TEXT, mins_in_trade REAL);
---   .import --csv --skip 1 nathan_journal.csv trades
---   .mode column
---   .headers on
+--   python update_data.py --db-only
+--   sqlite3 -header -column journal.db ".read analysis.sql"
 -- ============================================================
+
+-- Shared equity curve: one row per trade in sequence (date, then trade_no).
+-- The peak starts at 0R, so early losses count as drawdown (as in dashboard.html).
+DROP VIEW IF EXISTS equity_curve;
+CREATE VIEW equity_curve AS
+WITH running AS (
+    SELECT date, trade_no, r, SUM(r) OVER (ORDER BY date, trade_no) AS cum_r
+    FROM trades
+),
+peaks AS (
+    SELECT *, MAX(0, MAX(cum_r) OVER (ORDER BY date, trade_no)) AS peak_r
+    FROM running
+)
+SELECT date, trade_no, r, cum_r, peak_r, cum_r - peak_r AS drawdown_r
+FROM peaks;
 
 -- 1. Headline statistics
 SELECT
@@ -59,13 +67,13 @@ ORDER BY grade_bucket;
 
 -- 5. Grade discipline over time: share of trades that were A-grade, by month
 SELECT
-    strftime('%Y-%m', date)                             AS month,
+    strftime('%Y-%m', date)                             AS trade_month,
     COUNT(*)                                            AS trades,
     ROUND(100.0 * SUM(SUBSTR(grade,1,1) = 'A') / COUNT(*), 1) AS pct_a_grade,
     ROUND(SUM(r), 2)                                    AS net_r
 FROM trades
-GROUP BY month
-ORDER BY month;
+GROUP BY trade_month
+ORDER BY trade_month;
 
 -- 6. Performance by trade type
 SELECT
@@ -77,24 +85,12 @@ FROM trades
 GROUP BY type
 ORDER BY net_r DESC;
 
--- 7. Equity curve and drawdown in R (window functions)
-WITH equity AS (
-    SELECT date, r, SUM(r) OVER (ORDER BY date, trade_no) AS cum_r FROM trades
-),
-peaks AS (
-    SELECT date, cum_r, MAX(cum_r) OVER (ORDER BY date) AS peak FROM equity
-)
-SELECT date, ROUND(cum_r, 2) AS equity_r, ROUND(cum_r - peak, 2) AS drawdown_r
-FROM peaks ORDER BY date;
+-- 7. Equity curve and drawdown in R
+SELECT date, trade_no, ROUND(cum_r, 2) AS equity_r, ROUND(drawdown_r, 2) AS drawdown_r
+FROM equity_curve ORDER BY date, trade_no;
 
 -- 8. Maximum drawdown suffered (R)
-WITH equity AS (
-    SELECT date, trade_no, SUM(r) OVER (ORDER BY date, trade_no) AS cum_r FROM trades
-),
-peaks AS (
-    SELECT cum_r, MAX(cum_r) OVER (ORDER BY date, trade_no) AS peak FROM equity
-)
-SELECT ROUND(MIN(cum_r - peak), 2) AS max_drawdown_r FROM peaks;
+SELECT ROUND(MIN(drawdown_r), 2) AS max_drawdown_r FROM equity_curve;
 
 -- 9. Longest losing streak (gaps-and-islands)
 WITH flagged AS (
@@ -110,10 +106,10 @@ FROM (SELECT COUNT(*) AS streak FROM flagged WHERE is_loss = 1 GROUP BY grp);
 
 -- 10. Violation rate by month: did discipline improve?
 SELECT
-    strftime('%Y-%m', date)                                   AS month,
+    strftime('%Y-%m', date)                                   AS trade_month,
     COUNT(*)                                                  AS trades,
     ROUND(100.0 * SUM(violations > 0) / COUNT(*), 1)          AS violation_rate_pct,
     ROUND(SUM(r), 2)                                          AS net_r
 FROM trades
-GROUP BY month
-ORDER BY month;
+GROUP BY trade_month
+ORDER BY trade_month;
